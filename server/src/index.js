@@ -51,6 +51,13 @@ app.use('/api/designs', designRoutes);
 app.use('/api/variants', variantRoutes);
 app.use('/api/admin', adminRoutes);
 
+const clientDist = resolve(__dirname, '../../client/dist');
+app.use(express.static(clientDist, { maxAge: '1h', index: false }));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
+  res.sendFile(resolve(clientDist, 'index.html'), (err) => { if (err) next(); });
+});
+
 app.use(notFound);
 app.use(errorHandler);
 
