@@ -7,8 +7,9 @@ const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
 // Luma-key threshold: only the very dark VP9 background (~16-25) gets removed.
 // A soft falloff between floor and ceiling avoids harsh edges on the character.
-const LUMA_FLOOR = 0.05;  // below this: fully transparent
-const LUMA_CEIL = 0.10;   // above this: fully opaque
+const LUMA_FLOOR = 0.04;
+const LUMA_CEIL = 0.10;
+const SAT_MIN = 0.08;
 
 const COMBINED_MASK =
   'linear-gradient(to bottom, transparent 0%, black 18%, black 87%, transparent 100%), radial-gradient(ellipse 55% 75% at 50% 46%, black 30%, rgba(0,0,0,0.5) 42%, transparent 54%)';
@@ -41,8 +42,13 @@ function lumaKeyFrame(video, ctx, w, h) {
   const ceil = LUMA_CEIL * 255;
   const range = ceil - floor;
   for (let i = 0; i < d.length; i += 4) {
-    const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-    if (lum < ceil) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+    if (max === 0) continue;
+    const sat = (max - min) / max;
+    if (lum < ceil && sat < SAT_MIN) {
       const alpha = Math.max(0, (lum - floor) / range);
       d[i + 3] = Math.round(d[i + 3] * alpha);
     }
