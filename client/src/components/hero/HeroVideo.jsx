@@ -5,9 +5,10 @@ const POSTER_SRC = '/img/hero-video-poster.jpg';
 const LOOP_SECONDS = 10;
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
-// Luma-key threshold: pixels darker than this become fully transparent.
-// VP9 "black" is ~16–25; anything below 50 is safely background.
-const LUMA_THRESHOLD = 0.18;
+// Luma-key threshold: only the very dark VP9 background (~16-25) gets removed.
+// A soft falloff between floor and ceiling avoids harsh edges on the character.
+const LUMA_FLOOR = 0.05;  // below this: fully transparent
+const LUMA_CEIL = 0.10;   // above this: fully opaque
 
 const COMBINED_MASK =
   'linear-gradient(to bottom, transparent 0%, black 18%, black 87%, transparent 100%), radial-gradient(ellipse 55% 75% at 50% 46%, black 30%, rgba(0,0,0,0.5) 42%, transparent 54%)';
@@ -36,11 +37,14 @@ function lumaKeyFrame(video, ctx, w, h) {
   ctx.drawImage(video, 0, 0, w, h);
   const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
-  const threshold = LUMA_THRESHOLD * 255;
+  const floor = LUMA_FLOOR * 255;
+  const ceil = LUMA_CEIL * 255;
+  const range = ceil - floor;
   for (let i = 0; i < d.length; i += 4) {
     const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-    if (lum < threshold) {
-      d[i + 3] = 0;
+    if (lum < ceil) {
+      const alpha = Math.max(0, (lum - floor) / range);
+      d[i + 3] = Math.round(d[i + 3] * alpha);
     }
   }
   ctx.putImageData(img, 0, 0);
