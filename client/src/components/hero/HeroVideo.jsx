@@ -42,9 +42,9 @@ const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 //     sides and corners only.
 const SIDE_MASK = {
   maskImage:
-    'radial-gradient(ellipse 80% 100% at 50% 46%, black 38%, rgba(0,0,0,0.9) 50%, transparent 62%)',
+    'radial-gradient(ellipse 68% 92% at 50% 46%, black 30%, rgba(0,0,0,0.5) 44%, transparent 56%)',
   WebkitMaskImage:
-    'radial-gradient(ellipse 80% 100% at 50% 46%, black 38%, rgba(0,0,0,0.9) 50%, transparent 62%)',
+    'radial-gradient(ellipse 68% 92% at 50% 46%, black 30%, rgba(0,0,0,0.5) 44%, transparent 56%)',
 };
 
 const VERTICAL_FADE_MASK =
@@ -70,8 +70,9 @@ const FLIGHT_KEYFRAMES = [
 // (~16–25), which mix-blend-screen alone lifts as a faint rectangular veil over
 // the scene. `brightness(1.14)` then `contrast(1.3)` pushes the grey bg below
 // black while lifting the logo's glow. The STAGE_MASK below then guarantees no
-// box edge can ever render.
-const VIDEO_FILTER = 'brightness(1.14) contrast(1.3) saturate(0.9)';
+// box edge can ever render. Higher contrast on mobile GPUs where VP9 decoding
+// runs lighter — the extra stop crushes the dark halo around the character.
+const VIDEO_FILTER = 'brightness(1.2) contrast(1.5) saturate(0.85)';
 
 const RIM_GRADIENT =
   'radial-gradient(130% 95% at 50% 16%, rgba(90,255,185,0.32) 0%, rgba(90,255,185,0.10) 38%, transparent 60%), linear-gradient(to right, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to left, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to bottom, rgba(45,255,159,0.10) 0%, transparent 26%)';
@@ -188,7 +189,7 @@ export default function HeroVideo() {
               <img
                 src={POSTER_SRC}
                 alt=""
-                className="relative h-full w-full object-cover mix-blend-screen"
+          className="relative h-full w-full object-cover bg-transparent mix-blend-screen"
                 style={{
                   filter: VIDEO_FILTER,
                   ...SIDE_MASK,
