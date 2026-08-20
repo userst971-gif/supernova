@@ -1,48 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 const VIDEO_SRC = '/video/hero-supernova.webm';
 const POSTER_SRC = '/img/hero-video-poster.jpg';
 const LOOP_SECONDS = 10;
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
-// SUPERNOVA wordmark reel. The source clip is a 10s VP9 sequence on a near-
-// black background (a centred glowing logo, brightest around 30–40% height).
-// mix-blend-screen keys the black out against the cinematic night scene.
-// The sweep mirrors the clip's internal motion 1:1: a Web Animations API
-// animation reproduces the .hero-flight keyframes, paused and frame-locked to
-// the video's currentTime every rAF, so the sweep and the playhead can never
-// drift. The video is looped, so the reel repeats seamlessly.
-//
-// The source webm has NO alpha channel, so a true transparent cut-out is not
-// available. Two things guarantee the viewer never sees a video box:
-//   1. screen-blend keys the near-black background out,
-//   2. STAGE_MASK feathered-fades the box edges to fully transparent (top,
-//      corners and bottom), so even residual VP9 noise can never draw a
-//      rectangle. The logo stays solid in the centre; its glow dissolves
-//      into the mask before the box edge, which reads as atmospheric haze.
-//
-// Integration (the logo is lit BY this environment, not pasted on top):
-//   - A dark multiply pool sits UNDER the video, deepening the night scene
-//     directly behind the wordmark so the glow pops instead of washing out.
-//   - An emerald rim overlay picks up the aurora, so the logo catches green
-//     light from the same source that lights the sky.
-//
-// STAGE_MASK must fade EVERY box edge to fully transparent, not just the
-// sides. A lone radial ellipse can't do that: with its centre at 46% height,
-// the top edge (46% of the radius) and bottom edge (54%) land inside the
-// opaque stops, so the rim glow paints bright bars along the top/bottom of
-// the box — the "rectangle" that keeps coming back once the background is
-// bright.
-//
-// The fix uses nested masks (they multiply, no mask-composite needed):
-//   - a wrapper div gets VERTICAL_FADE_MASK — one linear gradient fading the
-//     top 0–18% and the bottom 87–100% to fully transparent, so no top/bottom
-//     bar can ever paint,
-//   - the video + rim keep SIDE_MASK, a radial ellipse that feathers the
-//     sides and corners only.
-// Combined mask: vertical fade (top 0–18%, bottom 87–100% transparent) multiplied
-// with radial side mask. Applied directly to the video so it does NOT create an
-// isolated stacking context that would kill mix-blend-screen.
+// Luma-key threshold: pixels darker than this become fully transparent.
+// VP9 "black" is ~16–25; anything below 50 is safely background.
+const LUMA_THRESHOLD = 0.18;
+
 const COMBINED_MASK =
   'linear-gradient(to bottom, transparent 0%, black 18%, black 87%, transparent 100%), radial-gradient(ellipse 55% 75% at 50% 46%, black 30%, rgba(0,0,0,0.5) 42%, transparent 54%)';
 const COMBINED_MASK_STYLE = {
@@ -58,29 +24,81 @@ const FLIGHT_KEYFRAMES = [
   { transform: 'translate3d(0, 0, 0)', opacity: 1, offset: 0.25, easing: EASE },
   { transform: 'translate3d(0, 0, 0)', opacity: 1, offset: 0.6, easing: EASE },
   { transform: 'translate3d(45%, 0, 0)', opacity: 1, offset: 0.7, easing: 'linear' },
-  { transform: 'translate3d(90%, 0, 0)', opacity: 0, offset: 0.8, easing: EASE },
-  { transform: 'translate3d(140%, 0, 0)', opacity: 0, offset: 0.97, easing: EASE },
-  { transform: 'translate3d(150%, 0, 0)', opacity: 0, offset: 1 },
+  { transform: 'translate3d(90%, 0, 0)', opacity: 1, offset: 0.8, easing: EASE },
+  { transform: 'translate3d(140%, 0, 0)', opacity: 1, offset: 0.97, easing: EASE },
+  { transform: 'translate3d(150%, 0, 0)', opacity: 1, offset: 1 },
 ];
-
-// Luma key via CSS: VP9's "pure black" background is really dark grey
-// (~16–25), which mix-blend-screen alone lifts as a faint rectangular veil over
-// the scene. Aggressive contrast crushes all near-black compression artifacts to
-// pure black so screen-blend makes them fully transparent on every GPU.
-// Order matters: brightness BEFORE contrast (too much contrast first crushes
-// the logo).
-const VIDEO_FILTER = 'brightness(1.3) contrast(3) saturate(0.8)';
 
 const RIM_GRADIENT =
   'radial-gradient(130% 95% at 50% 16%, rgba(90,255,185,0.32) 0%, rgba(90,255,185,0.10) 38%, transparent 60%), linear-gradient(to right, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to left, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to bottom, rgba(45,255,159,0.10) 0%, transparent 26%)';
 
+function lumaKeyFrame(video, ctx, w, h) {
+  ctx.drawImage(video, 0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const threshold = LUMA_THRESHOLD * 255;
+  for (let i = 0; i < d.length; i += 4) {
+    const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+    if (lum < threshold) {
+      d[i + 3] = 0;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 function HeroStage({ videoRef }) {
+  const canvasRef = useRef(null);
+  const offCtxRef = useRef(null);
+  const rafRef = useRef(null);
+  const sizeRef = useRef({ w: 0, h: 0 });
+
+  const drawFrame = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = offCtxRef.current;
+    if (!video || !canvas || !ctx || video.paused || video.ended) {
+      rafRef.current = requestAnimationFrame(drawFrame);
+      return;
+    }
+
+    const { w, h } = sizeRef.current;
+    if (w === 0 || h === 0) {
+      rafRef.current = requestAnimationFrame(drawFrame);
+      return;
+    }
+
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+
+    lumaKeyFrame(video, ctx, w, h);
+    rafRef.current = requestAnimationFrame(drawFrame);
+  }, [videoRef]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    offCtxRef.current = canvas.getContext('2d', { willReadFrequently: true });
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        sizeRef.current = { w: Math.round(width), h: Math.round(height) };
+      }
+    });
+    ro.observe(canvas);
+
+    rafRef.current = requestAnimationFrame(drawFrame);
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [drawFrame]);
+
   return (
     <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
-      {/* dark backdrop pool — multiplies the night scene away in a TIGHT pool
-          around the wordmark so the glow pops without a big shadow ellipse
-          reading as a container. Placed UNDER the video so it only darkens
-          what's behind the logo, never the logo itself. */}
       <div
         className="pointer-events-none absolute -inset-x-[4%] -inset-y-[4%] mix-blend-multiply"
         style={{
@@ -89,28 +107,12 @@ function HeroStage({ videoRef }) {
         }}
       />
 
-      {/* video with combined mask — NO wrapper div with mask (that would
-          create an isolated stacking context and break mix-blend-screen). */}
-      <video
-        ref={videoRef}
-        src={VIDEO_SRC}
-        muted
-        playsInline
-        autoPlay
-        loop
-        preload="metadata"
-        disablePictureInPicture
-        controls={false}
-        className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
-        style={{
-          filter: VIDEO_FILTER,
-          ...COMBINED_MASK_STYLE,
-        }}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 h-full w-full object-cover"
+        style={COMBINED_MASK_STYLE}
       />
 
-      {/* emerald backlight — aurora spilling over the wordmark's glow so it
-          catches green light from the same source that lights the sky.
-          Also uses the combined mask directly (no wrapper). */}
       <div
         className="absolute inset-0 mix-blend-screen"
         aria-hidden="true"
@@ -185,7 +187,7 @@ export default function HeroVideo() {
               alt=""
               className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
               style={{
-                filter: VIDEO_FILTER,
+                filter: 'brightness(1.3) contrast(3) saturate(0.8)',
                 ...COMBINED_MASK_STYLE,
               }}
             />
@@ -207,6 +209,20 @@ export default function HeroVideo() {
     <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
       <div className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2">
         <div ref={flightRef} className="hero-flight">
+          {/* hidden <video> feeds frames to the canvas luma-key pipeline */}
+          <video
+            ref={videoRef}
+            src={VIDEO_SRC}
+            muted
+            playsInline
+            autoPlay
+            loop
+            preload="metadata"
+            disablePictureInPicture
+            controls={false}
+            className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
+            aria-hidden="true"
+          />
           <HeroStage videoRef={videoRef} />
         </div>
       </div>
