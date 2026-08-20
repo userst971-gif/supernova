@@ -6,3 +6,6 @@ buildCommand = "npm install && npm run build --workspace client"
 startCommand = "npm run start --workspace server"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
+
+[variables]
+NODE_ENV = "production"

@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js",
+    "dev": "node --experimental-sqlite --watch src/index.js",
+    "start": "node --experimental-sqlite src/index.js",
     "seed": "node src/seed.js"
   },
   "dependencies": {
