@@ -1,0 +1,27 @@
+{
+  "name": "supernova",
+  "private": true,
+  "version": "1.0.0",
+  "description": "SUPERNOVA — cosmic dark-mode apparel store with a live aurora borealis.",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "setup": "npm install --workspaces",
+    "dev": "concurrently -n server,client -c green,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace client",
+    "start": "npm run start --workspace server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  },
+  "overrides": {
+    "esbuild": "0.21.3"
+  },
+  "allowScripts": {
+    "esbuild@0.21.3": true
+  }
+}

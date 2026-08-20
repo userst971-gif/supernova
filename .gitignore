@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.log
+.env
+.env.local
+.DS_Store
+data/
+server/data/
+server/uploads/*
+!server/uploads/.gitkeep
+devlog.txt
+raw.json
+resp.json
+Aurora.png

@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #050505;
+  color: #e7f5ef;
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(66, 245, 150, 0.35);
+  color: #ffffff;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(66, 245, 150, 0.25);
+  border-radius: 999px;
+  border: 2px solid #050505;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(66, 245, 150, 0.45);
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12;
+  }
+
+  .text-glow-green {
+    text-shadow:
+      0 0 12px rgba(66, 245, 150, 0.75),
+      0 0 32px rgba(66, 245, 150, 0.4),
+      0 0 90px rgba(66, 245, 150, 0.25);
+  }
+
+  .text-glow-soft {
+    text-shadow: 0 0 24px rgba(124, 247, 198, 0.35);
+  }
+
+  .text-gradient-emerald {
+    background: linear-gradient(
+      100deg,
+      #f5f7f6 0%,
+      #f5f7f6 36%,
+      #21f59a 68%,
+      #2dff9f 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .text-glow-fade {
+    text-shadow: 0 0 22px rgba(45, 255, 159, 0.35);
+  }
+
+  .editorial-track {
+    letter-spacing: 0.55em;
+    text-indent: 0.55em;
+  }
+
+  .btn-aurora {
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-aurora-500 to-aurora-400 px-8 py-3.5 font-medium tracking-widest text-black transition-transform duration-300 hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40;
+    box-shadow: 0 0 28px rgba(66, 245, 150, 0.45);
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-8 py-3.5 font-medium tracking-widest text-white/90 transition-all duration-300 hover:border-aurora-400/60 hover:text-aurora-300 active:scale-95;
+  }
+
+  /* AI Generate button — animated multicolor gradient (cyan → blue → purple →
+     pink → warm yellow), 5.5s flow, soft glow, subtle sparkle. CSS only. */
+  .btn-ai-gem {
+    @apply relative inline-flex items-center justify-center gap-2 rounded-full px-8 py-3.5 font-medium tracking-widest text-black transition-transform duration-300 hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40;
+    isolation: isolate;
+    box-shadow:
+      0 0 20px rgba(103, 232, 249, 0.28),
+      0 0 42px rgba(168, 85, 247, 0.22),
+      0 0 64px rgba(244, 114, 182, 0.14);
+  }
+
+  .btn-ai-gem::before,
+  .btn-ai-gem::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      110deg,
+      #22d3ee 0%,
+      #60a5fa 18%,
+      #a78bfa 38%,
+      #f472b6 58%,
+      #fbbf24 78%,
+      #22d3ee 100%
+    );
+    background-size: 260% 100%;
+    animation: ai-gem-flow 5.5s ease-in-out infinite;
+    will-change: background-position;
+  }
+
+  .btn-ai-gem::before {
+    z-index: -1;
+  }
+
+  .btn-ai-gem::after {
+    z-index: -2;
+    inset: -28%;
+    border-radius: 9999px;
+    filter: blur(22px);
+    opacity: 0.45;
+    transition: opacity 0.35s ease;
+  }
+
+  .btn-ai-gem:hover::before {
+    filter: brightness(1.18) saturate(1.06);
+  }
+
+  .btn-ai-gem:hover::after {
+    opacity: 0.7;
+  }
+
+  .btn-ai-gem:hover {
+    box-shadow:
+      0 0 26px rgba(103, 232, 249, 0.42),
+      0 0 56px rgba(168, 85, 247, 0.34),
+      0 0 84px rgba(244, 114, 182, 0.24);
+  }
+
+  .ai-gem-spark {
+    display: inline-block;
+    animation: ai-gem-spark 3s ease-in-out infinite;
+  }
+
+  .card-dark {
+    @apply rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-aurora-400/70 focus:ring-1 focus:ring-aurora-400/40;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-[0.2em] text-white/50;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs tracking-widest text-white/60;
+  }
+}
+
+/* Superhero entrance reel: HeroVideo.jsx drives this element's sweep with a
+   paused Web Animations API animation frame-locked to the video playhead, so no
+   CSS animation is declared here. The static default keeps the clip off-screen
+   left (matching the reel's phase 0) before the JS takes over. */
+.hero-flight {
+  transform: translate3d(-150%, 0, 0);
+  opacity: 0;
+}
+
+@keyframes ai-gem-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes ai-gem-spark {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
