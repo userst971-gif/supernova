@@ -1,3 +1,39 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:78e1a0ec76e5a9cfc76602d6f922f8874408bae893950aa3d87f8f9a13ac9f83
-size 2217
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#080a0c"/>
+      <stop offset="1" stop-color="#040505"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.25" r="0.75">
+      <stop offset="0" stop-color="#7dd3fc" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#60a5fa" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="garment" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#171a1d"/>
+      <stop offset="1" stop-color="#0a0b0d"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="40"/>
+    </filter>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <rect width="800" height="1000" fill="url(#glow)"/>
+  <g transform="translate(0 60)">
+    <ellipse cx="400" cy="330" rx="260" ry="320" fill="#7dd3fc" opacity="0.22" filter="url(#soft)"/>
+    <path d="M265 290 L300 262 L370 275 L395 330 L382 470 L398 760 L330 810 L310 720 L300 810 L235 760 L248 470 L235 330 L265 290 Z" />
+      <path d="M315 265 L325 720" stroke="#0d0f11" stroke-width="8" />
+      <path d="M248 470 L382 470" stroke="#0d0f11" stroke-width="8" />
+      <path d="M235 330 L265 290 L300 262 L370 275 L395 330" fill="none" stroke="#0d0f11" stroke-width="12" stroke-linecap="round" />
+  </g>
+  <g stroke="#7dd3fc" stroke-width="2.5" opacity="0.8" fill="none" stroke-linecap="round">
+    <path d="M120 120 h60 M120 132 h40"/>
+    <path d="M680 120 h-60 M680 132 h-40"/>
+  </g>
+  <circle cx="618" cy="98" r="2.5" fill="#7dd3fc"/>
+  <circle cx="650" cy="110" r="1.8" fill="#60a5fa"/>
+  <circle cx="172" cy="92" r="1.6" fill="#ffffff"/>
+  <circle cx="140" cy="118" r="2" fill="#60a5fa"/>
+  <text x="400" y="920" text-anchor="middle" font-family="monospace" font-size="26" letter-spacing="14" fill="#ffffff" opacity="0.85">POLARIS PUFFER</text>
+  <text x="400" y="956" text-anchor="middle" font-family="monospace" font-size="16" letter-spacing="8" fill="#7dd3fc" opacity="0.7">AURORA</text>
+</svg>

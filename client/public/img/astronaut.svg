@@ -1,3 +1,74 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:1db8d3a25336d2e5522fc70bfbe8cb527e54f4889683a1276517097c51af0673
-size 4783
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <defs>
+    <radialGradient id="visor" cx="0.35" cy="0.32" r="0.95">
+      <stop offset="0" stop-color="#122019"/>
+      <stop offset="0.55" stop-color="#050807"/>
+      <stop offset="1" stop-color="#000000"/>
+    </radialGradient>
+    <linearGradient id="suit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a3037"/>
+      <stop offset="1" stop-color="#14171b"/>
+    </linearGradient>
+    <linearGradient id="suitDark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1d2227"/>
+      <stop offset="1" stop-color="#0d1012"/>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+  </defs>
+
+  <ellipse cx="200" cy="212" rx="150" ry="150" fill="#42f596" opacity="0.08" filter="url(#soft)"/>
+
+  <g transform="rotate(-10 200 205)">
+    <rect x="138" y="148" width="124" height="92" rx="20" fill="url(#suitDark)" stroke="#262c33" stroke-width="2"/>
+    <rect x="150" y="214" width="100" height="6" rx="3" fill="#42f596" opacity="0.5"/>
+    <circle cx="170" cy="214" r="3" fill="#42f596" opacity="0.9" filter="url(#glow)"/>
+
+    <path d="M252 172 L288 162 L322 130" stroke="url(#suitDark)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M288 162 L322 130" stroke="url(#suit)" stroke-width="24" stroke-linecap="round" opacity="0.35"/>
+    <circle cx="324" cy="128" r="15" fill="#12151a" stroke="#262c33" stroke-width="2"/>
+    <circle cx="324" cy="128" r="6" fill="none" stroke="#42f596" stroke-width="1.6" opacity="0.9" filter="url(#glow)"/>
+
+    <path d="M148 174 L114 204 L82 242" stroke="url(#suitDark)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="80" cy="244" r="15" fill="#12151a" stroke="#262c33" stroke-width="2"/>
+    <circle cx="80" cy="244" r="6" fill="none" stroke="#42f596" stroke-width="1.6" opacity="0.9" filter="url(#glow)"/>
+
+    <rect x="156" y="146" width="88" height="104" rx="30" fill="url(#suit)" stroke="#31383f" stroke-width="2"/>
+    <path d="M172 168 V230 M228 168 V230" stroke="#0d0f12" stroke-width="3" opacity="0.8"/>
+    <path d="M200 186 L205 199 L219 199 L207.5 208 L211.5 222 L200 213 L188.5 222 L192.5 208 L181 199 L195 199 Z" fill="#42f596" filter="url(#glow)"/>
+    <circle cx="200" cy="222" r="2.2" fill="#42f596" filter="url(#glow)"/>
+    <circle cx="200" cy="168" r="2.2" fill="#42f596" opacity="0.7" filter="url(#glow)"/>
+
+    <rect x="178" y="244" width="44" height="26" rx="13" fill="#20262c" stroke="#262c33" stroke-width="2"/>
+
+    <path d="M222 266 L254 296 L294 326" stroke="url(#suitDark)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="240" cy="284" r="5" fill="none" stroke="#42f596" stroke-width="1.8" opacity="0.8" filter="url(#glow)"/>
+    <ellipse cx="298" cy="330" rx="24" ry="17" fill="#12151a" stroke="#262c33" stroke-width="2"/>
+    <path d="M292 322 L304 322" stroke="#42f596" stroke-width="2" opacity="0.8" filter="url(#glow)"/>
+
+    <path d="M178 266 L148 300 L112 340" stroke="url(#suitDark)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="164" cy="286" r="5" fill="none" stroke="#42f596" stroke-width="1.8" opacity="0.8" filter="url(#glow)"/>
+    <ellipse cx="108" cy="344" rx="24" ry="17" fill="#12151a" stroke="#262c33" stroke-width="2"/>
+    <path d="M102 336 L114 336" stroke="#42f596" stroke-width="2" opacity="0.8" filter="url(#glow)"/>
+
+    <rect x="176" y="132" width="48" height="14" rx="7" fill="#20262c" stroke="#2b3239" stroke-width="2"/>
+
+    <circle cx="200" cy="82" r="56" fill="url(#suit)" stroke="#31383f" stroke-width="2"/>
+    <ellipse cx="200" cy="84" rx="35" ry="32" fill="url(#visor)" stroke="#3a434b" stroke-width="2"/>
+    <ellipse cx="186" cy="70" rx="10" ry="7" fill="#42f596" opacity="0.5" filter="url(#soft)"/>
+    <path d="M200 84 m-6 -14 a9 9 0 0 1 12 0" stroke="#42f596" stroke-width="1.5" opacity="0.8" filter="url(#glow)"/>
+    <path d="M212 26 L216 14" stroke="#2b3239" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="216" cy="11" r="3.5" fill="#42f596" filter="url(#glow)"/>
+  </g>
+
+  <circle cx="92" cy="80" r="2" fill="#42f596" opacity="0.8"/>
+  <circle cx="316" cy="60" r="1.6" fill="#42f596" opacity="0.7"/>
+  <circle cx="72" cy="150" r="1.4" fill="#7cf7c6" opacity="0.8"/>
+  <circle cx="330" cy="200" r="1.8" fill="#42f596" opacity="0.75"/>
+  <circle cx="120" cy="300" r="1.5" fill="#7cf7c6" opacity="0.6"/>
+</svg>

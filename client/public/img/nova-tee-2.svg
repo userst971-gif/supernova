@@ -1,3 +1,37 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:829c7a4dcfea47fe0cc87edf7e1eac655085de1f798e82cf90ef2737813b2d40
-size 2084
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#080a0c"/>
+      <stop offset="1" stop-color="#040505"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.25" r="0.75">
+      <stop offset="0" stop-color="#a7f3d0" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#34d399" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="garment" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#171a1d"/>
+      <stop offset="1" stop-color="#0a0b0d"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="40"/>
+    </filter>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <rect width="800" height="1000" fill="url(#glow)"/>
+  <g transform="translate(0 60)">
+    <ellipse cx="400" cy="330" rx="260" ry="320" fill="#a7f3d0" opacity="0.22" filter="url(#soft)"/>
+    <path d="M285 285 L315 265 L385 280 L405 330 L395 480 L405 770 L340 800 L315 710 L305 800 L240 770 L250 480 L240 330 L260 280 Z" />
+      <path d="M240 330 L260 280 L285 285 L315 265 L385 280 L405 330" fill="none" stroke="#0d0f11" stroke-width="12" stroke-linecap="round" />
+  </g>
+  <g stroke="#a7f3d0" stroke-width="2.5" opacity="0.8" fill="none" stroke-linecap="round">
+    <path d="M120 120 h60 M120 132 h40"/>
+    <path d="M680 120 h-60 M680 132 h-40"/>
+  </g>
+  <circle cx="618" cy="98" r="2.5" fill="#a7f3d0"/>
+  <circle cx="650" cy="110" r="1.8" fill="#34d399"/>
+  <circle cx="172" cy="92" r="1.6" fill="#ffffff"/>
+  <circle cx="140" cy="118" r="2" fill="#34d399"/>
+  <text x="400" y="920" text-anchor="middle" font-family="monospace" font-size="26" letter-spacing="14" fill="#ffffff" opacity="0.85">NOVA · DETAIL</text>
+  <text x="400" y="956" text-anchor="middle" font-family="monospace" font-size="16" letter-spacing="8" fill="#a7f3d0" opacity="0.7">AURORA</text>
+</svg>
