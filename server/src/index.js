@@ -53,8 +53,10 @@ app.use('/api/admin', adminRoutes);
 
 const clientDist = resolve(__dirname, '../../client/dist');
 app.use(express.static(clientDist, { maxAge: '1h', index: false }));
+const STATIC_EXT = /\.(glb|gltf|png|jpe?g|gif|svg|webp|woff2?|ttf|eot|ico|mp4|webm|mp3|ogg|wav|json|css|js|wasm)$/i;
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
+  if (STATIC_EXT.test(req.path)) return next();
   res.sendFile(resolve(clientDist, 'index.html'), (err) => { if (err) next(); });
 });
 
