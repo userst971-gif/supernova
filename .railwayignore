@@ -1,0 +1,5 @@
+client/public/video/
+data/
+server/data/
+server/uploads/*
+!server/uploads/.gitkeep
