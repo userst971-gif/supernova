@@ -22,7 +22,7 @@ export default function Auth() {
           ? await login(form.email, form.password)
           : await register(form.name, form.email, form.password);
       toast(user.role === 'admin' ? 'Welcome back, Nova Admin.' : 'Welcome to the dark side.');
-      navigate(user.role === 'admin' ? '/studio' : '/shop');
+      navigate(user.role === 'admin' ? '/admin' : '/shop');
     } catch (err) {
       toast(err.message, 'error');
     } finally {
