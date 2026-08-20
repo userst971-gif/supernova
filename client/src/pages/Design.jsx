@@ -11,47 +11,6 @@ import { toast } from '../components/ToastHost';
 const MY_DESIGNS_KEY = 'aurora_my_designs';
 const HINT_KEY = 'aurora_rotate_hint_dismissed';
 
-function makeSampleDesign() {
-  const c = document.createElement('canvas');
-  c.width = 1024;
-  c.height = 1024;
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, 1024, 1024);
-  const cx = 512;
-  const cy = 512;
-  const grad = ctx.createRadialGradient(cx, cy, 60, cx, cy, 470);
-  grad.addColorStop(0, 'rgba(45,255,159,0.55)');
-  grad.addColorStop(1, 'rgba(33,245,154,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 470, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(45,255,159,0.85)';
-  ctx.lineWidth = 6;
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(a) * 130, cy + Math.sin(a) * 130);
-    ctx.lineTo(cx + Math.cos(a) * 470, cy + Math.sin(a) * 470);
-    ctx.stroke();
-  }
-  ctx.fillStyle = '#21f59a';
-  ctx.beginPath();
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
-    const r = i % 2 ? 150 : 340;
-    ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#f5f7f6';
-  ctx.font = '700 96px "Space Grotesk", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('AURORA', cx, cy + 250);
-  return c.toDataURL('image/png');
-}
-
 /** Loads a design dataURL into a square 1024 CanvasTexture (aspect preserved). */
 function useArtTexture(dataUrl) {
   const [texture, setTexture] = useState(null);
@@ -516,17 +475,9 @@ export default function Design() {
       <button onClick={() => setAiOpen(true)} className="btn-ai-gem w-full text-xs">
         <span className="ai-gem-spark">✦</span> Generate with AI
       </button>
-      <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => fileRef.current?.click()} className="btn-ghost !px-3 !py-2.5 text-[10px]">
-          Upload image
-        </button>
-        <button
-          onClick={() => applyArt(makeSampleDesign(), 'Aurora sample')}
-          className="btn-ghost !px-3 !py-2.5 text-[10px]"
-        >
-          Use sample
-        </button>
-      </div>
+      <button onClick={() => fileRef.current?.click()} className="btn-ghost w-full !px-3 !py-2.5 text-[10px]">
+        Upload image
+      </button>
       <input
         ref={fileRef}
         type="file"
