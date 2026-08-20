@@ -6,9 +6,9 @@ const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
 // Canvas luma-key: only the very darkest neutral-grey pixels (VP9 background)
 // become transparent. Dark-but-colored pixels (the suit lit by aurora) are kept.
-const LUMA_FLOOR = 0.03;
-const LUMA_CEIL = 0.10;
-const SAT_KEEP = 0.10;
+const LUMA_FLOOR = 0.04;
+const LUMA_CEIL = 0.16;
+const SAT_KEEP = 0.12;
 
 const FLIGHT_KEYFRAMES = [
   { transform: 'translate3d(-150%, 0, 0)', opacity: 0, easing: EASE },
@@ -173,6 +173,11 @@ export default function HeroVideo() {
             <canvas
               ref={canvasRef}
               className="absolute inset-0 h-full w-full object-cover"
+              style={{
+                maskImage: 'radial-gradient(ellipse 72% 80% at 50% 46%, black 55%, rgba(0,0,0,0.5) 75%, transparent 100%)',
+                WebkitMaskImage: 'radial-gradient(ellipse 72% 80% at 50% 46%, black 55%, rgba(0,0,0,0.5) 75%, transparent 100%)',
+                filter: 'brightness(1.25) contrast(1.15)',
+              }}
             />
           </div>
         </div>
