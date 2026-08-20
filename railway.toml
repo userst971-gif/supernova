@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npm run build --workspace client"
+buildCommand = "git lfs install && git lfs pull && npm install && npm run build --workspace client"
 
 [deploy]
 startCommand = "npm run start --workspace server"
