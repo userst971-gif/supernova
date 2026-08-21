@@ -152,6 +152,10 @@ export default function HeroVideo() {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
+    const SCALE = 0.35;
+    const offscreen = document.createElement('canvas');
+    const offCtx = offscreen.getContext('2d', { willReadFrequently: true });
+
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
@@ -166,8 +170,29 @@ export default function HeroVideo() {
         if (canvas.width !== w || canvas.height !== h) {
           canvas.width = w;
           canvas.height = h;
+          offscreen.width = Math.round(w * SCALE);
+          offscreen.height = Math.round(h * SCALE);
         }
-        lumaKeyFrame(video, ctx, w, h);
+        const ow = offscreen.width;
+        const oh = offscreen.height;
+        offCtx.drawImage(video, 0, 0, ow, oh);
+        const img = offCtx.getImageData(0, 0, ow, oh);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          const lum = r * 0.299 + g * 0.587 + b * 0.114;
+          const maxC = Math.max(r, g, b);
+          const minC = Math.min(r, g, b);
+          const sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
+          if (sat < 0.12 && lum < 30) {
+            const t = Math.max(0, Math.min(1, (lum - 10) / 20));
+            d[i + 3] = Math.round(d[i + 3] * t * t * t);
+          }
+        }
+        offCtx.putImageData(img, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(offscreen, 0, 0, w, h);
       }
       rafRef.current = requestAnimationFrame(draw);
     };
