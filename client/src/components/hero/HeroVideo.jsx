@@ -1,8 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 
 const VIDEO_SRC = '/video/hero-supernova.webm';
+const POSTER_SRC = '/img/hero-video-poster.jpg';
 const LOOP_SECONDS = 10;
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+const SIDE_MASK = {
+  maskImage:
+    'radial-gradient(ellipse 80% 100% at 50% 46%, black 38%, rgba(0,0,0,0.9) 50%, transparent 62%)',
+  WebkitMaskImage:
+    'radial-gradient(ellipse 80% 100% at 50% 46%, black 38%, rgba(0,0,0,0.9) 50%, transparent 62%)',
+};
+
+const VERTICAL_FADE_MASK =
+  'linear-gradient(to bottom, transparent 0%, black 18%, black 87%, transparent 100%)';
+
+const VERTICAL_FADE_STYLE = {
+  maskImage: VERTICAL_FADE_MASK,
+  WebkitMaskImage: VERTICAL_FADE_MASK,
+};
 
 const FLIGHT_KEYFRAMES = [
   { transform: 'translate3d(-150%, 0, 0)', opacity: 0, easing: EASE },
@@ -15,28 +31,55 @@ const FLIGHT_KEYFRAMES = [
   { transform: 'translate3d(150%, 0, 0)', opacity: 1, offset: 1 },
 ];
 
-function lumaKeyFrame(video, ctx, w, h) {
-  ctx.drawImage(video, 0, 0, w, h);
-  const img = ctx.getImageData(0, 0, w, h);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const r = d[i], g = d[i + 1], b = d[i + 2];
-    const lum = r * 0.299 + g * 0.587 + b * 0.114;
-    if (lum < 35) {
-      const alpha = Math.max(0, (lum - 4) / 31);
-      d[i + 3] = Math.round(d[i + 3] * alpha);
-    }
-  }
-  ctx.putImageData(img, 0, 0);
+const VIDEO_FILTER = 'brightness(1.14) contrast(1.3) saturate(0.9)';
+
+const RIM_GRADIENT =
+  'radial-gradient(130% 95% at 50% 16%, rgba(90,255,185,0.32) 0%, rgba(90,255,185,0.10) 38%, transparent 60%), linear-gradient(to right, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to left, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to bottom, rgba(45,255,159,0.10) 0%, transparent 26%)';
+
+function HeroStage({ videoRef }) {
+  return (
+    <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
+      <div
+        className="pointer-events-none absolute -inset-x-[4%] -inset-y-[4%] mix-blend-multiply"
+        style={{
+          background:
+            'radial-gradient(ellipse 42% 46% at 50% 54%, rgba(1,3,3,0.55) 0%, rgba(1,3,3,0.28) 46%, transparent 70%)',
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0" style={VERTICAL_FADE_STYLE}>
+        <video
+          ref={videoRef}
+          src={VIDEO_SRC}
+          muted
+          playsInline
+          autoPlay
+          loop
+          preload="metadata"
+          disablePictureInPicture
+          controls={false}
+          className="relative h-full w-full object-cover mix-blend-screen"
+          style={{
+            filter: VIDEO_FILTER,
+            ...SIDE_MASK,
+          }}
+        />
+        <div
+          className="absolute inset-0 mix-blend-screen"
+          aria-hidden="true"
+          style={{
+            ...SIDE_MASK,
+            background: RIM_GRADIENT,
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function HeroVideo() {
   const [reduced, setReduced] = useState(false);
   const videoRef = useRef(null);
   const flightRef = useRef(null);
-  const canvasRef = useRef(null);
-  const rafRef = useRef(null);
-  const sizeRef = useRef({ w: 0, h: 0 });
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -78,56 +121,37 @@ export default function HeroVideo() {
     };
   }, [reduced]);
 
-  useEffect(() => {
-    if (reduced) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return;
-
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        sizeRef.current = { w: Math.round(width), h: Math.round(height) };
-      }
-    });
-    ro.observe(canvas.parentElement);
-
-    const draw = () => {
-      const { w, h } = sizeRef.current;
-      if (w > 0 && h > 0 && !video.paused && !video.ended) {
-        if (canvas.width !== w || canvas.height !== h) {
-          canvas.width = w;
-          canvas.height = h;
-        }
-        lumaKeyFrame(video, ctx, w, h);
-      }
-      rafRef.current = requestAnimationFrame(draw);
-    };
-    rafRef.current = requestAnimationFrame(draw);
-
-    return () => {
-      ro.disconnect();
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [reduced]);
-
   if (reduced) {
     return (
       <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
         <div className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2">
           <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
-            <video
-              src={VIDEO_SRC}
-              muted
-              playsInline
-              loop
-              preload="metadata"
-              className="h-full w-full object-cover mix-blend-screen"
-              style={{ filter: 'brightness(1.3) contrast(3) saturate(0.8)' }}
+            <div
+              className="absolute -inset-x-[4%] -inset-y-[4%] mix-blend-multiply"
+              style={{
+                background:
+                  'radial-gradient(ellipse 42% 46% at 50% 54%, rgba(1,3,3,0.55) 0%, rgba(1,3,3,0.28) 46%, transparent 70%)',
+              }}
             />
+            <div className="pointer-events-none absolute inset-0" style={VERTICAL_FADE_STYLE}>
+              <img
+                src={POSTER_SRC}
+                alt=""
+                className="relative h-full w-full object-cover mix-blend-screen"
+                style={{
+                  filter: VIDEO_FILTER,
+                  ...SIDE_MASK,
+                }}
+              />
+              <div
+                className="absolute inset-0 mix-blend-screen"
+                aria-hidden="true"
+                style={{
+                  ...SIDE_MASK,
+                  background: RIM_GRADIENT,
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -138,26 +162,7 @@ export default function HeroVideo() {
     <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
       <div className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2">
         <div ref={flightRef} className="hero-flight">
-          <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
-            <video
-              ref={videoRef}
-              src={VIDEO_SRC}
-              muted
-              playsInline
-              autoPlay
-              loop
-              preload="metadata"
-              disablePictureInPicture
-              controls={false}
-              className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
-              aria-hidden="true"
-            />
-            <canvas
-              ref={canvasRef}
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ filter: 'brightness(1.3) contrast(1.1)' }}
-            />
-          </div>
+          <HeroStage videoRef={videoRef} />
         </div>
       </div>
     </div>
