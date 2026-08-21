@@ -31,12 +31,25 @@ const FLIGHT_KEYFRAMES = [
   { transform: 'translate3d(150%, 0, 0)', opacity: 1, offset: 1 },
 ];
 
-const VIDEO_FILTER = 'brightness(1.14) contrast(1.3) saturate(0.9)';
+function lumaKeyFrame(video, ctx, w, h) {
+  ctx.drawImage(video, 0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    const sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
+    if (sat < 0.12 && lum < 30) {
+      const t = Math.max(0, Math.min(1, (lum - 10) / 20));
+      d[i + 3] = Math.round(d[i + 3] * t * t * t);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
 
-const RIM_GRADIENT =
-  'radial-gradient(130% 95% at 50% 16%, rgba(90,255,185,0.32) 0%, rgba(90,255,185,0.10) 38%, transparent 60%), linear-gradient(to right, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to left, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to bottom, rgba(45,255,159,0.10) 0%, transparent 26%)';
-
-function HeroStage({ videoRef }) {
+function HeroStage({ videoRef, canvasRef }) {
   return (
     <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
       <div
@@ -57,10 +70,15 @@ function HeroStage({ videoRef }) {
           preload="metadata"
           disablePictureInPicture
           controls={false}
-          className="relative h-full w-full object-cover mix-blend-screen"
+          className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
+          aria-hidden="true"
+        />
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 h-full w-full object-cover"
           style={{
-            filter: VIDEO_FILTER,
             ...SIDE_MASK,
+            filter: 'brightness(1.25) contrast(1.15)',
           }}
         />
         <div
@@ -68,7 +86,8 @@ function HeroStage({ videoRef }) {
           aria-hidden="true"
           style={{
             ...SIDE_MASK,
-            background: RIM_GRADIENT,
+            background:
+              'radial-gradient(130% 95% at 50% 16%, rgba(90,255,185,0.32) 0%, rgba(90,255,185,0.10) 38%, transparent 60%), linear-gradient(to right, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to left, rgba(60,255,175,0.22) 0%, transparent 16%), linear-gradient(to bottom, rgba(45,255,159,0.10) 0%, transparent 26%)',
           }}
         />
       </div>
@@ -80,6 +99,9 @@ export default function HeroVideo() {
   const [reduced, setReduced] = useState(false);
   const videoRef = useRef(null);
   const flightRef = useRef(null);
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  const sizeRef = useRef({ w: 0, h: 0 });
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -121,6 +143,42 @@ export default function HeroVideo() {
     };
   }, [reduced]);
 
+  useEffect(() => {
+    if (reduced) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        sizeRef.current = { w: Math.round(width), h: Math.round(height) };
+      }
+    });
+    ro.observe(canvas.parentElement);
+
+    const draw = () => {
+      const { w, h } = sizeRef.current;
+      if (w > 0 && h > 0 && !video.paused && !video.ended) {
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        lumaKeyFrame(video, ctx, w, h);
+      }
+      rafRef.current = requestAnimationFrame(draw);
+    };
+    rafRef.current = requestAnimationFrame(draw);
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [reduced]);
+
   if (reduced) {
     return (
       <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
@@ -139,7 +197,7 @@ export default function HeroVideo() {
                 alt=""
                 className="relative h-full w-full object-cover mix-blend-screen"
                 style={{
-                  filter: VIDEO_FILTER,
+                  filter: 'brightness(1.14) contrast(1.3) saturate(0.9)',
                   ...SIDE_MASK,
                 }}
               />
@@ -148,7 +206,8 @@ export default function HeroVideo() {
                 aria-hidden="true"
                 style={{
                   ...SIDE_MASK,
-                  background: RIM_GRADIENT,
+                  background:
+                    'radial-gradient(130% 95% at 50% 16%, rgba(90,255,185,0.32) 0%, rgba(90,255,185,0.10) 38%, transparent 60%)',
                 }}
               />
             </div>
@@ -162,7 +221,7 @@ export default function HeroVideo() {
     <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
       <div className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2">
         <div ref={flightRef} className="hero-flight">
-          <HeroStage videoRef={videoRef} />
+          <HeroStage videoRef={videoRef} canvasRef={canvasRef} />
         </div>
       </div>
     </div>
