@@ -80,7 +80,8 @@ function exportArtImage(dataUrl, bgHex) {
 function loadDesigns() {
   try {
     const list = JSON.parse(localStorage.getItem(MY_DESIGNS_KEY) || '[]');
-    return Array.isArray(list) ? list : [];
+    if (!Array.isArray(list)) return [];
+    return list.filter((d) => !d.label || d.label !== 'Aurora sample');
   } catch {
     return [];
   }
@@ -429,8 +430,10 @@ export default function Design() {
   const applyArt = useCallback(
     (dataUrl, label) => {
       setArt(dataUrl);
-      persistDesign(dataUrl, label);
-      toast(label ? `“${label}” applied to the garment.` : 'Design applied to the garment.');
+      if (label) {
+        persistDesign(dataUrl, label);
+      }
+      toast(label ? `"${label}" applied to the garment.` : 'Design applied to the garment.');
     },
     [persistDesign]
   );
