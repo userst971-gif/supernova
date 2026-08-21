@@ -15,10 +15,28 @@ const FLIGHT_KEYFRAMES = [
   { transform: 'translate3d(150%, 0, 0)', opacity: 1, offset: 1 },
 ];
 
+function lumaKeyFrame(video, ctx, w, h) {
+  ctx.drawImage(video, 0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+    if (lum < 35) {
+      const alpha = Math.max(0, (lum - 4) / 31);
+      d[i + 3] = Math.round(d[i + 3] * alpha);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 export default function HeroVideo() {
   const [reduced, setReduced] = useState(false);
   const videoRef = useRef(null);
   const flightRef = useRef(null);
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  const sizeRef = useRef({ w: 0, h: 0 });
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -60,6 +78,42 @@ export default function HeroVideo() {
     };
   }, [reduced]);
 
+  useEffect(() => {
+    if (reduced) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        sizeRef.current = { w: Math.round(width), h: Math.round(height) };
+      }
+    });
+    ro.observe(canvas.parentElement);
+
+    const draw = () => {
+      const { w, h } = sizeRef.current;
+      if (w > 0 && h > 0 && !video.paused && !video.ended) {
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        lumaKeyFrame(video, ctx, w, h);
+      }
+      rafRef.current = requestAnimationFrame(draw);
+    };
+    rafRef.current = requestAnimationFrame(draw);
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [reduced]);
+
   if (reduced) {
     return (
       <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
@@ -81,11 +135,7 @@ export default function HeroVideo() {
   }
 
   return (
-    <div
-      className="pointer-events-none absolute inset-0 z-40"
-      style={{ mixBlendMode: 'screen' }}
-      aria-hidden="true"
-    >
+    <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
       <div className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2">
         <div ref={flightRef} className="hero-flight">
           <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
@@ -99,8 +149,13 @@ export default function HeroVideo() {
               preload="metadata"
               disablePictureInPicture
               controls={false}
-              className="h-full w-full object-cover"
-              style={{ filter: 'brightness(1.4) contrast(3) saturate(0.85)' }}
+              className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
+              aria-hidden="true"
+            />
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ filter: 'brightness(1.3) contrast(1.1)' }}
             />
           </div>
         </div>
