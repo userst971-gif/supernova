@@ -100,7 +100,7 @@ export default function HeroVideo() {
               aria-hidden="true"
               className="absolute inset-0 h-full w-full object-cover"
               style={{
-                filter: 'brightness(1.14) contrast(1.3) saturate(0.9)',
+                filter: 'brightness(1.8) contrast(1.6) saturate(1.1)',
               }}
             />
           </div>
