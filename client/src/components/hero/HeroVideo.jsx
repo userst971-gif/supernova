@@ -122,11 +122,11 @@ export default function HeroVideo() {
           const sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
           if (sat < 0.12 && lum < 30) {
             d[i + 3] = 0;
-          } else if (lum < 60) {
-            const boost = 2.0 + (60 - lum) / 60;
-            d[i] = Math.min(255, r * boost);
-            d[i + 1] = Math.min(255, g * boost);
-            d[i + 2] = Math.min(255, b * boost);
+          } else if (lum < 80) {
+            const boost = 1.5 + (80 - lum) / 80;
+            d[i] = Math.min(255, Math.round(r * boost));
+            d[i + 1] = Math.min(255, Math.round(g * boost));
+            d[i + 2] = Math.min(255, Math.round(b * boost));
           }
         }
         offCtx.putImageData(img, 0, 0);
@@ -149,17 +149,15 @@ export default function HeroVideo() {
       <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
         <div className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2">
           <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
-            <div className="pointer-events-none absolute inset-0" style={VERTICAL_FADE_STYLE}>
-              <img
-                src={POSTER_SRC}
-                alt=""
-                className="relative h-full w-full object-cover"
-                style={{
-                  filter: 'brightness(1.14) contrast(1.3) saturate(0.9)',
-                  ...SIDE_MASK,
-                }}
-              />
-            </div>
+            <img
+              src={POSTER_SRC}
+              alt=""
+              className="h-full w-full object-cover"
+              style={{
+                filter: 'brightness(1.14) contrast(1.3) saturate(0.9)',
+                ...SIDE_MASK,
+              }}
+            />
           </div>
         </div>
       </div>
@@ -167,7 +165,11 @@ export default function HeroVideo() {
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
+    <div
+      className="pointer-events-none absolute inset-0 z-40"
+      aria-hidden="true"
+      style={{ mixBlendMode: 'screen' }}
+    >
       <div className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2">
         <div ref={flightRef} className="hero-flight">
           <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
@@ -183,11 +185,12 @@ export default function HeroVideo() {
                 disablePictureInPicture
                 controls={false}
                 aria-hidden="true"
-                className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
+                className="absolute inset-0 h-full w-full pointer-events-none"
+                style={{ filter: 'brightness(1.5) contrast(1.4) saturate(1.1)' }}
               />
               <canvas
                 ref={canvasRef}
-                className="absolute inset-0 h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                 style={SIDE_MASK}
               />
             </div>
