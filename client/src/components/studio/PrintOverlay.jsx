@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import { useThree } from '@react-three/fiber';
+import { setStudioDragging } from './dragState';
 
 const SCALE_MIN = 0.4;
 const SCALE_MAX = 2.5;
@@ -307,12 +308,15 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       visRef.current = { dx: 0, dy: 0, scaleMul: 1, rotAdd: 0 };
       if (controls) controls.enabled = false;
       setDragging(true);
+      setStudioDragging(true);
     },
     [editable, camera, controls, placement]
   );
 
   useEffect(() => {
     if (!dragging) return undefined;
+    let rafId = 0;
+    let pending = false;
     const onMove = (e) => {
       const d = dragRef.current;
       if (!d) return;
@@ -333,7 +337,13 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
         visRef.current.rotAdd = ((angle - d.startAngle) * 180) / Math.PI;
       }
       applyVisualTransform(groupRef.current, basePoseRef.current, visRef.current);
-      invalidate();
+      if (!pending) {
+        pending = true;
+        rafId = requestAnimationFrame(() => {
+          pending = false;
+          invalidate();
+        });
+      }
     };
     const onUp = () => {
       const d = dragRef.current;
@@ -356,6 +366,7 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       visRef.current = { dx: 0, dy: 0, scaleMul: 1, rotAdd: 0 };
       dragRef.current = null;
       setDragging(false);
+      setStudioDragging(false);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
@@ -364,6 +375,7 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
