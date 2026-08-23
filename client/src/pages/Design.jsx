@@ -378,6 +378,7 @@ export default function Design() {
   const [art, setArt] = useState(null);
   const [placement, setPlacement] = useState({ ...PRINT_DEFAULT });
   const [tool, setTool] = useState('move');
+  const [face, setFace] = useState('front');
   const [designs, setDesigns] = useState(loadDesigns);
   const [aiOpen, setAiOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -551,13 +552,14 @@ export default function Design() {
             className="card-dark relative order-1 h-[58vh] overflow-hidden lg:order-none lg:col-span-6 lg:h-full"
             onPointerDown={dismissHint}
           >
-            <DesignToolbar tool={tool} onToolChange={setTool} placement={placement} onChange={setPlacement} />
+            <DesignToolbar tool={tool} onToolChange={setTool} face={face} onFaceChange={setFace} placement={placement} onChange={setPlacement} />
             <GarmentStage
               product={product}
               color={color.hex}
               texture={texture}
               placement={placement}
               tool={tool}
+              face={face}
               resetRef={resetRef}
               onReady={handleReady}
               onPlacementChange={(patch) => setPlacement((prev) => ({ ...prev, ...patch }))}

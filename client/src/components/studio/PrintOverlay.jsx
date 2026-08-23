@@ -3,9 +3,7 @@ import * as THREE from 'three';
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import { useThree } from '@react-three/fiber';
 
-const PLACEMENT_MIN = -0.4;
-const PLACEMENT_MAX = 0.4;
-const SCALE_MIN = 0.5;
+const SCALE_MIN = 0.4;
 const SCALE_MAX = 2.5;
 
 function clamp(v, min, max) {
@@ -30,14 +28,34 @@ function linePoints(a, b) {
 }
 
 /**
+ * Compute max placement offset so the scaled print stays inside the garment.
+ * Garment bbox is roughly ±0.35 wide, ±0.5 tall (normalized height=1).
+ */
+function getBounds(scale) {
+  const garmentHalfW = 0.32;
+  const garmentHalfH = 0.45;
+  const halfPrintW = 0.17 * scale;
+  const halfPrintH = 0.13 * scale;
+  return {
+    xMin: Math.max(-garmentHalfW + halfPrintW, -0.3),
+    xMax: Math.min(garmentHalfW - halfPrintW, 0.3),
+    yMin: Math.max(-garmentHalfH + halfPrintH, -0.35),
+    yMax: Math.min(garmentHalfH - halfPrintH, 0.35),
+  };
+}
+
+/**
  * PrintOverlay — projects artwork onto the garment surface.
  *
  * PERFORMANCE: During drag, geometry is FROZEN. Only a lightweight group
  * transform (position/scale/quaternion) is applied per frame — zero
  * raycasts, zero geometry work. The full DecalGeometry rebuild happens
  * once on pointer-up with the final placement values.
+ *
+ * Bounds are scale-aware: as the print gets bigger, the center is
+ * constrained tighter so the art never escapes the garment silhouette.
  */
-export default function PrintOverlay({ target, texture, zone, placement, front = true, onPlacementChange, tool = 'move' }) {
+export default function PrintOverlay({ target, texture, zone, placement, front = true, onPlacementChange, tool = 'move', face = 'front' }) {
   const invalidate = useThree((s) => s.invalidate);
   const controls = useThree((s) => s.controls);
   const camera = useThree((s) => s.camera);
@@ -58,6 +76,10 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
 
   const editable = !!onPlacementChange;
 
+  // Determine projection direction from face
+  const projFront = face === 'front' || face === 'right';
+  const projAxis = face === 'left' || face === 'right' ? 'x' : 'z';
+
   const rebuild = useCallback(() => {
     if (!target || !texture) {
       setGeometry(null);
@@ -69,7 +91,23 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     const zoneW = zone.size[0] * placement.scale;
     const zoneH = zone.size[1] * placement.scale;
 
-    const fit = fitSurface(target, placement.x, zone.y + placement.y, zoneW, zoneH, front);
+    let cx = placement.x;
+    let cy = zone.y + placement.y;
+    let shootDir;
+    let shootOrigin;
+
+    if (projAxis === 'x') {
+      // Side projection
+      shootDir = new THREE.Vector3(face === 'right' ? -1 : 1, 0, 0);
+      shootOrigin = new THREE.Vector3(face === 'right' ? 10 : -10, cy, cx);
+      // For sides, swap x/z conceptually — project onto side surface
+      cx = zone.y + placement.y; // use y as depth
+      cy = placement.x;
+    } else {
+      shootDir = new THREE.Vector3(0, 0, projFront ? -1 : 1);
+    }
+
+    const fit = fitSurface(target, placement.x, zone.y + placement.y, zoneW, zoneH, projFront, projAxis, face);
     if (!fit) {
       setGeometry(null);
       invalidate();
@@ -134,7 +172,7 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       off += g.attributes.position.count;
       g.dispose();
     }
-    const groupPos = center.clone().addScaledVector(normal, 0.0002);
+    const groupPos = center.clone().addScaledVector(normal, 0.0003);
     const invProjector = new THREE.Matrix4()
       .makeRotationFromQuaternion(quat)
       .setPosition(groupPos)
@@ -174,24 +212,23 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       const hits = probe.intersectObject(target, true);
       if (hits.length) {
         const local = hits[0].point.clone().sub(center).applyQuaternion(quat.clone().invert());
-        handleZ = Math.max(0.008, local.z + 0.01);
+        handleZ = Math.max(0.012, local.z + 0.015);
       }
     }
     poseRef.current = {
-      position: center.clone().addScaledVector(normal, 0.0002),
+      position: center.clone().addScaledVector(normal, 0.0003),
       quaternion: quat.clone(),
       size: { w, h },
       handleZ,
     };
     basePoseRef.current = poseRef.current;
     invalidate();
-  }, [target, texture, zone, placement.scale, placement.x, placement.y, front, invalidate]);
+  }, [target, texture, zone, placement.scale, placement.x, placement.y, front, projFront, projAxis, face, invalidate]);
 
-  // Only rebuild when NOT dragging
   useEffect(() => {
     if (dragging) return;
     clearTimeout(timer.current);
-    timer.current = setTimeout(rebuild, 60);
+    timer.current = setTimeout(rebuild, 50);
     return () => clearTimeout(timer.current);
   }, [rebuild, dragging]);
 
@@ -233,8 +270,11 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       const hit = new THREE.Vector3();
       if (!e.ray.intersectPlane(plane, hit)) return;
 
-      // Snapshot pose for visual offsets
-      basePoseRef.current = { ...poseRef.current, position: poseRef.current.position.clone(), quaternion: poseRef.current.quaternion.clone() };
+      basePoseRef.current = {
+        ...poseRef.current,
+        position: poseRef.current.position.clone(),
+        quaternion: poseRef.current.quaternion.clone(),
+      };
 
       if (mode === 'move') {
         dragRef.current = {
@@ -271,7 +311,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     [editable, camera, controls, placement]
   );
 
-  // Drag loop — only updates group transform, ZERO geometry work
   useEffect(() => {
     if (!dragging) return undefined;
     const onMove = (e) => {
@@ -282,34 +321,29 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
 
       if (d.mode === 'move') {
         const local = hit.sub(d.startPoint).applyQuaternion(d.quatInv);
-        const nx = clamp(d.startX + local.x, PLACEMENT_MIN, PLACEMENT_MAX);
-        const ny = clamp(d.startY + local.y, PLACEMENT_MIN, PLACEMENT_MAX);
-        // Compute visual offset from base position
-        visRef.current.dx = nx - d.startX;
-        visRef.current.dy = ny - d.startY;
+        const b = getBounds(d.startScale);
+        visRef.current.dx = clamp(d.startX + local.x, b.xMin, b.xMax) - d.startX;
+        visRef.current.dy = clamp(d.startY + local.y, b.yMin, b.yMax) - d.startY;
       } else if (d.mode === 'scale') {
         const dist = hit.distanceTo(d.pivot);
-        const ns = clamp(d.startScale * (dist / d.startDist), SCALE_MIN, SCALE_MAX);
-        visRef.current.scaleMul = ns / d.startScale;
+        visRef.current.scaleMul = clamp(dist / d.startDist, SCALE_MIN / d.startScale, SCALE_MAX / d.startScale);
       } else if (d.mode === 'rotate') {
         const local = hit.clone().sub(d.pivot).applyQuaternion(d.quatInv);
         const angle = Math.atan2(local.y, local.x);
-        const delta = ((angle - d.startAngle) * 180) / Math.PI;
-        visRef.current.rotAdd = delta;
+        visRef.current.rotAdd = ((angle - d.startAngle) * 180) / Math.PI;
       }
-      // Apply visual transform to group directly — instant, no rebuild
       applyVisualTransform(groupRef.current, basePoseRef.current, visRef.current);
       invalidate();
     };
     const onUp = () => {
       const d = dragRef.current;
-      // Commit final values to placement state (triggers one rebuild)
       if (d) {
         const v = visRef.current;
         if (d.mode === 'move') {
+          const b = getBounds(d.startScale);
           onChangeRef.current?.({
-            x: clamp(d.startX + v.dx, PLACEMENT_MIN, PLACEMENT_MAX),
-            y: clamp(d.startY + v.dy, PLACEMENT_MIN, PLACEMENT_MAX),
+            x: clamp(d.startX + v.dx, b.xMin, b.xMax),
+            y: clamp(d.startY + v.dy, b.yMin, b.yMax),
           });
         } else if (d.mode === 'scale') {
           onChangeRef.current?.({ scale: clamp(d.startScale * v.scaleMul, SCALE_MIN, SCALE_MAX) });
@@ -378,8 +412,8 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
           depthWrite
           depthTest
           polygonOffset
-          polygonOffsetFactor={-0.4}
-          polygonOffsetUnits={-0.4}
+          polygonOffsetFactor={-2}
+          polygonOffsetUnits={-2}
           roughness={0.95}
           metalness={0}
           side={THREE.FrontSide}
@@ -470,22 +504,18 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
   );
 }
 
-/** Apply visual-only transform to the group — zero geometry work. */
 function applyVisualTransform(group, basePose, vis) {
   if (!group || !basePose) return;
   const { dx, dy, scaleMul, rotAdd } = vis;
 
-  // Position offset in local XY
   group.position.copy(basePose.position);
   if (dx || dy) {
     const localOff = new THREE.Vector3(dx, dy, 0).applyQuaternion(basePose.quaternion);
     group.position.add(localOff);
   }
 
-  // Scale
   group.scale.setScalar(scaleMul);
 
-  // Rotation
   if (rotAdd) {
     const rotQ = new THREE.Quaternion().setFromAxisAngle(
       new THREE.Vector3(0, 0, 1).applyQuaternion(basePose.quaternion),
@@ -497,17 +527,32 @@ function applyVisualTransform(group, basePose, vis) {
   }
 }
 
-function fitSurface(target, cx, cy, w, h, front) {
+function fitSurface(target, cx, cy, w, h, front, axis = 'z', face = 'front') {
   const raycaster = new THREE.Raycaster();
-  const dir = new THREE.Vector3(0, 0, front ? -1 : 1);
-  const origin = new THREE.Vector3();
+  let dir, getOrigin;
+
+  if (axis === 'x') {
+    dir = new THREE.Vector3(face === 'right' ? -1 : 1, 0, 0);
+    getOrigin = (ix, iy) => new THREE.Vector3(
+      face === 'right' ? 10 : -10,
+      cy + (iy / 8 - 0.5) * h,
+      cx + (ix / 8 - 0.5) * w
+    );
+  } else {
+    dir = new THREE.Vector3(0, 0, front ? -1 : 1);
+    getOrigin = (ix, iy) => new THREE.Vector3(
+      cx + (ix / 8 - 0.5) * w,
+      cy + (iy / 8 - 0.5) * h,
+      front ? 10 : -10
+    );
+  }
+
   const step = 8;
   const points = [];
   const normals = [];
   for (let ix = 0; ix <= step; ix++) {
     for (let iy = 0; iy <= step; iy++) {
-      origin.set(cx + (ix / step - 0.5) * w, cy + (iy / step - 0.5) * h, front ? 10 : -10);
-      raycaster.set(origin, dir);
+      raycaster.set(getOrigin(ix, iy), dir);
       const hits = raycaster.intersectObject(target, true);
       if (!hits.length) continue;
       points.push(hits[0].point);
@@ -522,9 +567,18 @@ function fitSurface(target, cx, cy, w, h, front) {
 
   const normal = new THREE.Vector3();
   for (const n of normals) normal.add(n);
-  if (normal.lengthSq() < 1e-6) normal.set(0, 0, front ? 1 : -1);
+  if (normal.lengthSq() < 1e-6) {
+    if (axis === 'x') normal.set(face === 'right' ? 1 : -1, 0, 0);
+    else normal.set(0, 0, front ? 1 : -1);
+  }
   normal.normalize();
-  if (front && normal.z < 0) normal.negate();
-  if (!front && normal.z > 0) normal.negate();
+  // Orient normal outward from the face
+  if (axis === 'z') {
+    if (front && normal.z < 0) normal.negate();
+    if (!front && normal.z > 0) normal.negate();
+  } else {
+    if (face === 'right' && normal.x < 0) normal.negate();
+    if (face === 'left' && normal.x > 0) normal.negate();
+  }
   return { center, normal };
 }
