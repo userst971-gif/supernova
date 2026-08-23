@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import ApparelModel from './ApparelModel';
@@ -7,28 +8,34 @@ import { onStudioDragging } from './dragState';
 
 let studioBackdrop = null;
 
-/** Disables shadows on all meshes during drag via traverse — no Canvas prop changes. */
-function ShadowManager({ dragging }) {
+/** Disables shadows + swaps to cheap materials during drag — no Canvas prop changes. */
+function DragOptimizer({ dragging }) {
   const scene = useThree((s) => s.scene);
   const gl = useThree((s) => s.gl);
-  const prevShadow = useRef(true);
+  const saved = useRef([]);
 
   useEffect(() => {
     if (dragging) {
+      saved.current = [];
       scene.traverse((o) => {
-        if (o.isMesh) {
-          if (o.castShadow) { o.castShadow = false; o.userData._wasCast = true; }
-          if (o.receiveShadow) { o.receiveShadow = false; o.userData._wasRecv = true; }
+        if (o.isMesh && o.material && o.material.isMeshStandardMaterial) {
+          saved.current.push({ mesh: o, castShadow: o.castShadow, receiveShadow: o.receiveShadow, material: o.material });
+          o.castShadow = false;
+          o.receiveShadow = false;
+          // Swap to a cheap unlit clone
+          const cheap = new THREE.MeshBasicMaterial({ map: o.material.map, color: o.material.color, side: o.material.side, transparent: o.material.transparent, opacity: o.material.opacity });
+          o.material = cheap;
         }
       });
       gl.shadowMap.enabled = false;
     } else {
-      scene.traverse((o) => {
-        if (o.isMesh) {
-          if (o.userData._wasCast) { o.castShadow = true; delete o.userData._wasCast; }
-          if (o.userData._wasRecv) { o.receiveShadow = true; delete o.userData._wasRecv; }
-        }
-      });
+      for (const s of saved.current) {
+        s.mesh.material.dispose();
+        s.mesh.material = s.material;
+        s.mesh.castShadow = s.castShadow;
+        s.mesh.receiveShadow = s.receiveShadow;
+      }
+      saved.current = [];
       gl.shadowMap.enabled = true;
     }
   }, [dragging, scene, gl]);
@@ -54,7 +61,7 @@ export default function ProductViewer({ product, color, texture, placement, tool
     >
       <StudioLight />
       {studioBackdrop && <primitive object={studioBackdrop} attach="background" />}
-      <ShadowManager dragging={studioDragging} />
+      <DragOptimizer dragging={studioDragging} />
       <ApparelModel
         product={product}
         color={color}
