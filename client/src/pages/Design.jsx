@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import GarmentStage from '../components/studio/GarmentStage';
+import DesignEditor from '../components/studio/DesignEditor';
 import { PRODUCTS, COLORS, SIZES, PRINT_DEFAULT, productById, colorById } from '../config/design';
 import { useCart } from '../context/CartContext';
 import { api, formatMoney } from '../lib/api';
@@ -527,8 +528,15 @@ export default function Design() {
                 <div className="space-y-2">{toolButtons}</div>
               </div>
               <div>
-                <p className="label">Print placement</p>
-                <PlacementControls placement={placement} onChange={setPlacement} />
+                <p className="label">Design editor</p>
+                <div className="h-[280px] lg:h-[calc(100%-8rem)]">
+                  <DesignEditor
+                    placement={placement}
+                    onChange={setPlacement}
+                    artUrl={art}
+                    garmentColor={color.hex}
+                  />
+                </div>
               </div>
               <div>
                 <div className="mb-2 flex items-center justify-between">
@@ -693,8 +701,15 @@ export default function Design() {
           </div>
 
           <div className="card-dark p-4">
-            <p className="label">Print placement</p>
-            <PlacementControls placement={placement} onChange={setPlacement} />
+            <p className="label">Design editor</p>
+            <div className="h-[240px]">
+              <DesignEditor
+                placement={placement}
+                onChange={setPlacement}
+                artUrl={art}
+                garmentColor={color.hex}
+              />
+            </div>
           </div>
 
           <div className="card-dark p-4">
