@@ -30,9 +30,12 @@ function linePoints(a, b) {
 }
 
 /**
- * PrintOverlay — projects artwork onto the garment surface as an opaque
- * screen-print. Supports toolbar-driven move / scale / rotate modes with
- * 4 corner handles, a rotation arc handle, and a bounding box outline.
+ * PrintOverlay — projects artwork onto the garment surface.
+ *
+ * PERFORMANCE: During drag, geometry is FROZEN. Only a lightweight group
+ * transform (position/scale/quaternion) is applied per frame — zero
+ * raycasts, zero geometry work. The full DecalGeometry rebuild happens
+ * once on pointer-up with the final placement values.
  */
 export default function PrintOverlay({ target, texture, zone, placement, front = true, onPlacementChange, tool = 'move' }) {
   const invalidate = useThree((s) => s.invalidate);
@@ -40,12 +43,14 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const [geometry, setGeometry] = useState(null);
-  const [dragMode, setDragMode] = useState(null);
+  const [dragging, setDragging] = useState(false);
   const timer = useRef(null);
   const poseRef = useRef(null);
   const dragRef = useRef(null);
   const onChangeRef = useRef(onPlacementChange);
   const groupRef = useRef(null);
+  const basePoseRef = useRef(null);
+  const visRef = useRef({ dx: 0, dy: 0, scaleMul: 1, rotAdd: 0 });
 
   useEffect(() => {
     onChangeRef.current = onPlacementChange;
@@ -178,14 +183,17 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       size: { w, h },
       handleZ,
     };
+    basePoseRef.current = poseRef.current;
     invalidate();
   }, [target, texture, zone, placement.scale, placement.x, placement.y, front, invalidate]);
 
+  // Only rebuild when NOT dragging
   useEffect(() => {
+    if (dragging) return;
     clearTimeout(timer.current);
-    timer.current = setTimeout(rebuild, dragMode ? 8 : 80);
+    timer.current = setTimeout(rebuild, 60);
     return () => clearTimeout(timer.current);
-  }, [rebuild, dragMode]);
+  }, [rebuild, dragging]);
 
   useEffect(() => {
     if (!texture) return;
@@ -198,16 +206,12 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
   useEffect(() => {
     return () => {
       clearTimeout(timer.current);
-      setGeometry((old) => {
-        if (old) old.dispose();
-        return null;
-      });
+      setGeometry((old) => { if (old) old.dispose(); return null; });
       poseRef.current = null;
+      basePoseRef.current = null;
       dragRef.current = null;
     };
   }, []);
-
-  const hovering = dragMode !== null;
 
   const onEnter = useCallback(() => {
     if (controls && !dragRef.current) controls.enabled = false;
@@ -229,6 +233,9 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       const hit = new THREE.Vector3();
       if (!e.ray.intersectPlane(plane, hit)) return;
 
+      // Snapshot pose for visual offsets
+      basePoseRef.current = { ...poseRef.current, position: poseRef.current.position.clone(), quaternion: poseRef.current.quaternion.clone() };
+
       if (mode === 'move') {
         dragRef.current = {
           mode,
@@ -248,24 +255,25 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
         };
       } else if (mode === 'rotate') {
         const local = hit.clone().sub(pivot).applyQuaternion(pose.quaternion.clone().invert());
-        const startAngle = Math.atan2(local.y, local.x);
         dragRef.current = {
           mode,
           plane,
           pivot,
-          startAngle,
+          startAngle: Math.atan2(local.y, local.x),
           origRotation: placement.rotation,
           quatInv: pose.quaternion.clone().invert(),
         };
       }
+      visRef.current = { dx: 0, dy: 0, scaleMul: 1, rotAdd: 0 };
       if (controls) controls.enabled = false;
-      setDragMode(mode);
+      setDragging(true);
     },
     [editable, camera, controls, placement]
   );
 
+  // Drag loop — only updates group transform, ZERO geometry work
   useEffect(() => {
-    if (!dragMode) return undefined;
+    if (!dragging) return undefined;
     const onMove = (e) => {
       const d = dragRef.current;
       if (!d) return;
@@ -274,25 +282,46 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
 
       if (d.mode === 'move') {
         const local = hit.sub(d.startPoint).applyQuaternion(d.quatInv);
-        onChangeRef.current?.({
-          x: clamp(d.startX + local.x, PLACEMENT_MIN, PLACEMENT_MAX),
-          y: clamp(d.startY + local.y, PLACEMENT_MIN, PLACEMENT_MAX),
-        });
+        const nx = clamp(d.startX + local.x, PLACEMENT_MIN, PLACEMENT_MAX);
+        const ny = clamp(d.startY + local.y, PLACEMENT_MIN, PLACEMENT_MAX);
+        // Compute visual offset from base position
+        visRef.current.dx = nx - d.startX;
+        visRef.current.dy = ny - d.startY;
       } else if (d.mode === 'scale') {
         const dist = hit.distanceTo(d.pivot);
-        onChangeRef.current?.({ scale: clamp(d.startScale * (dist / d.startDist), SCALE_MIN, SCALE_MAX) });
+        const ns = clamp(d.startScale * (dist / d.startDist), SCALE_MIN, SCALE_MAX);
+        visRef.current.scaleMul = ns / d.startScale;
       } else if (d.mode === 'rotate') {
         const local = hit.clone().sub(d.pivot).applyQuaternion(d.quatInv);
         const angle = Math.atan2(local.y, local.x);
         const delta = ((angle - d.startAngle) * 180) / Math.PI;
-        let rot = d.origRotation + delta;
-        rot = ((rot % 360) + 360) % 360;
-        onChangeRef.current?.({ rotation: Math.round(rot) });
+        visRef.current.rotAdd = delta;
       }
+      // Apply visual transform to group directly — instant, no rebuild
+      applyVisualTransform(groupRef.current, basePoseRef.current, visRef.current);
+      invalidate();
     };
     const onUp = () => {
+      const d = dragRef.current;
+      // Commit final values to placement state (triggers one rebuild)
+      if (d) {
+        const v = visRef.current;
+        if (d.mode === 'move') {
+          onChangeRef.current?.({
+            x: clamp(d.startX + v.dx, PLACEMENT_MIN, PLACEMENT_MAX),
+            y: clamp(d.startY + v.dy, PLACEMENT_MIN, PLACEMENT_MAX),
+          });
+        } else if (d.mode === 'scale') {
+          onChangeRef.current?.({ scale: clamp(d.startScale * v.scaleMul, SCALE_MIN, SCALE_MAX) });
+        } else if (d.mode === 'rotate') {
+          let rot = d.origRotation + v.rotAdd;
+          rot = ((rot % 360) + 360) % 360;
+          onChangeRef.current?.({ rotation: Math.round(rot) });
+        }
+      }
+      visRef.current = { dx: 0, dy: 0, scaleMul: 1, rotAdd: 0 };
       dragRef.current = null;
-      setDragMode(null);
+      setDragging(false);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
@@ -305,17 +334,15 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [dragMode, gl, camera, controls]);
+  }, [dragging, gl, camera, controls, invalidate]);
 
   useEffect(() => {
     const el = gl?.domElement;
     if (!el) return;
-    if (dragMode === 'scale') el.style.cursor = 'nwse-resize';
-    else if (dragMode === 'move') el.style.cursor = 'grabbing';
-    else if (dragMode === 'rotate') el.style.cursor = 'crosshair';
+    if (dragging) el.style.cursor = tool === 'scale' ? 'nwse-resize' : tool === 'rotate' ? 'crosshair' : 'grabbing';
     else if (editable) el.style.cursor = tool === 'scale' ? 'nwse-resize' : tool === 'rotate' ? 'crosshair' : 'grab';
     else el.style.cursor = '';
-  }, [gl, dragMode, editable, tool]);
+  }, [gl, dragging, editable, tool]);
 
   const pose = poseRef.current;
   if (!geometry || !texture || !pose) return null;
@@ -334,8 +361,7 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
   ];
 
   const rotArcR = Math.max(hw, hh) * 0.6;
-
-  const boxColor = dragMode ? '#21f59a' : 'rgba(255,255,255,0.35)';
+  const boxColor = dragging ? '#21f59a' : 'rgba(255,255,255,0.35)';
 
   return (
     <group ref={groupRef} position={pose.position} quaternion={pose.quaternion}>
@@ -362,7 +388,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
 
       {editable && (
         <>
-          {/* Bounding box outline */}
           <lineSegments renderOrder={3} frustumCulled={false}>
             <bufferGeometry>
               <bufferAttribute
@@ -380,7 +405,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
             <lineBasicMaterial color={boxColor} transparent opacity={0.6} depthTest={false} />
           </lineSegments>
 
-          {/* Scale handles — 4 corners */}
           {tool === 'scale' &&
             corners.map(([cx, cy], i) => (
               <mesh
@@ -397,7 +421,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
               </mesh>
             ))}
 
-          {/* Rotation handle — arc + dot */}
           {tool === 'rotate' && (
             <>
               <mesh
@@ -411,7 +434,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
                 <circleGeometry args={[0.03, 16]} />
                 <meshBasicMaterial color="#21f59a" transparent opacity={0.9} depthTest={false} side={THREE.DoubleSide} />
               </mesh>
-              {/* Connecting line */}
               <lineSegments renderOrder={4} frustumCulled={false}>
                 <bufferGeometry>
                   <bufferAttribute
@@ -426,29 +448,53 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
             </>
           )}
 
-          {/* Move mode — center crosshair */}
-          {tool === 'move' && !dragMode && (
-            <>
-              <lineSegments renderOrder={4} frustumCulled={false}>
-                <bufferGeometry>
-                  <bufferAttribute
-                    attach="attributes-position"
-                    count={4}
-                    array={new Float32Array([
-                      -0.02, 0, hz + 0.005, 0.02, 0, hz + 0.005,
-                      0, -0.02, hz + 0.005, 0, 0.02, hz + 0.005,
-                    ])}
-                    itemSize={3}
-                  />
-                </bufferGeometry>
-                <lineBasicMaterial color="#21f59a" transparent opacity={0.6} depthTest={false} />
-              </lineSegments>
-            </>
+          {tool === 'move' && !dragging && (
+            <lineSegments renderOrder={4} frustumCulled={false}>
+              <bufferGeometry>
+                <bufferAttribute
+                  attach="attributes-position"
+                  count={4}
+                  array={new Float32Array([
+                    -0.02, 0, hz + 0.005, 0.02, 0, hz + 0.005,
+                    0, -0.02, hz + 0.005, 0, 0.02, hz + 0.005,
+                  ])}
+                  itemSize={3}
+                />
+              </bufferGeometry>
+              <lineBasicMaterial color="#21f59a" transparent opacity={0.6} depthTest={false} />
+            </lineSegments>
           )}
         </>
       )}
     </group>
   );
+}
+
+/** Apply visual-only transform to the group — zero geometry work. */
+function applyVisualTransform(group, basePose, vis) {
+  if (!group || !basePose) return;
+  const { dx, dy, scaleMul, rotAdd } = vis;
+
+  // Position offset in local XY
+  group.position.copy(basePose.position);
+  if (dx || dy) {
+    const localOff = new THREE.Vector3(dx, dy, 0).applyQuaternion(basePose.quaternion);
+    group.position.add(localOff);
+  }
+
+  // Scale
+  group.scale.setScalar(scaleMul);
+
+  // Rotation
+  if (rotAdd) {
+    const rotQ = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 0, 1).applyQuaternion(basePose.quaternion),
+      (rotAdd * Math.PI) / 180
+    );
+    group.quaternion.copy(basePose.quaternion).premultiply(rotQ);
+  } else {
+    group.quaternion.copy(basePose.quaternion);
+  }
 }
 
 function fitSurface(target, cx, cy, w, h, front) {
