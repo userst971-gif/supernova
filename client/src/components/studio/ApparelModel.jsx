@@ -45,7 +45,7 @@ function normalize(group) {
  * tints it with the exact colorway (see materialTint.js), frames the camera
  * dynamically from the actual bounding box, and renders the print overlay.
  */
-export default function ApparelModel({ product, color, texture, placement, onReady, onFrame, diagnose, onPlacementChange }) {
+export default function ApparelModel({ product, color, texture, placement, tool, onReady, onFrame, diagnose, onPlacementChange }) {
   const [group, setGroup] = useState(null);
   const disposer = useRef([]);
   const lastFrameKey = useRef('');
@@ -138,7 +138,7 @@ export default function ApparelModel({ product, color, texture, placement, onRea
           <GltfContent key={product.model} model={product.model} groupRef={attach} />
         </Suspense>
       )}
-      <PrintOverlay target={group} texture={texture} zone={zone} placement={placement} front={front} onPlacementChange={onPlacementChange} />
+      <PrintOverlay target={group} texture={texture} zone={zone} placement={placement} front={front} onPlacementChange={onPlacementChange} tool={tool} />
     </>
   );
 }

@@ -7,13 +7,14 @@ import ProductViewer from './ProductViewer';
  * print, studio lighting, dynamic camera framing) lives in the new
  * ProductViewer / ApparelModel / PrintOverlay / StudioLight stack.
  */
-export default function GarmentStage({ product, color, texture, placement, resetRef, onReady, frameloop = 'demand', diagnose, onPlacementChange }) {
+export default function GarmentStage({ product, color, texture, placement, tool, resetRef, onReady, frameloop = 'demand', diagnose, onPlacementChange }) {
   return (
     <ProductViewer
       product={product}
       color={color}
       texture={texture}
       placement={placement}
+      tool={tool}
       resetRef={resetRef}
       onReady={onReady}
       frameloop={frameloop}

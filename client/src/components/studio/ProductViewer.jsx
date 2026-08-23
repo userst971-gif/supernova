@@ -37,7 +37,7 @@ const studioBackdrop = (() => {
  * controls. GarmentStage is now a thin wrapper around this component so both
  * Design.jsx and RenderPage.jsx keep their existing contracts.
  */
-export default function ProductViewer({ product, color, texture, placement, resetRef, onReady, frameloop = 'demand', diagnose, onPlacementChange }) {
+export default function ProductViewer({ product, color, texture, placement, tool, resetRef, onReady, frameloop = 'demand', diagnose, onPlacementChange }) {
   const [frame, setFrame] = useState(null);
 
   const handleReady = useCallback(() => onReady?.(), [onReady]);
@@ -57,6 +57,7 @@ export default function ProductViewer({ product, color, texture, placement, rese
         color={color}
         texture={texture}
         placement={placement}
+        tool={tool}
         onReady={handleReady}
         onFrame={setFrame}
         diagnose={diagnose}

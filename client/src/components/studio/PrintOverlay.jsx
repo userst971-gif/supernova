@@ -3,8 +3,6 @@ import * as THREE from 'three';
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import { useThree } from '@react-three/fiber';
 
-// Placement bounds — must match the sliders in Design.jsx so direct
-// manipulation and the panel can never disagree.
 const PLACEMENT_MIN = -0.4;
 const PLACEMENT_MAX = 0.4;
 const SCALE_MIN = 0.5;
@@ -27,60 +25,25 @@ function rayFromNDC(ndc, camera) {
   return new THREE.Ray(camera.position, v.sub(camera.position).normalize());
 }
 
+function linePoints(a, b) {
+  return [a.x, a.y, a.z, b.x, b.y, b.z];
+}
+
 /**
- * PrintOverlay — projects the customer's artwork onto the garment's actual
- * surface as an OPAQUE screen-print.
- *
- * The projector is fitted to the real surface, not the garment's axis-aligned
- * box: a raycast grid over the print footprint samples the fabric and the
- * projector plane (position + outward normal) is derived from those hits. The
- * decal then hugs the chest even on models whose node transform carries a
- * baked tilt (the current hoodie GLB) — the print never floats or skews, and
- * the clip footprint follows the chest band the user actually sees.
- *
- * Each garment mesh is clipped with DecalGeometry (proper edge-clipping, so
- * fan-triangulated panels like the tote's ShapeGeometry still print). All
- * fragments share the projector's local frame, so they merge into ONE opaque
- * mesh — no whole-garment bleed, no transparent material over the fabric.
- * The art is rotated by rotating its texture, so it stays surface-conforming.
- *
- * Slider controls fire on every input, so geometry is rebuilt on a debounced
- * trailing timer (~80ms) — dragging placement re-prints at most ~12x/sec.
- * While a pointer interaction is active the debounce drops to ~8ms so the
- * print tracks the cursor.
- *
- * Direct manipulation (only when onPlacementChange is provided, i.e. the
- * studio — RenderPage renders passive renders):
- *  - drag the print body → raycast to a camera-facing plane through the
- *    print centre; the screen delta is converted into the print's local frame
- *    (local X/Y == placement x/y because the garment is normalized to height
- *    1 and the projector's basis is derived from world-up), clamped to the
- *    slider bounds.
- *  - drag the corner handle → the handle's screen distance from the print
- *    centre is ratio-scaled against its distance at pointer-down.
- * OrbitControls are disabled while hovering the print or during a drag so
- * dragging on the print moves it instead of orbiting the camera.
- *
- * Props:
- *  target            — garment root (THREE.Object3D) to print onto (null until ready)
- *  texture           — CanvasTexture carrying the artwork (square, transparent bg)
- *  zone              — { y, size:[w,h] } print footprint (normalized, model height 1)
- *  placement         — { x, y, scale, rotation } user placement
- *  front             — true for front prints (camera at +Z)
- *  onPlacementChange — (patch) => void; enables drag-to-move/resize
+ * PrintOverlay — projects artwork onto the garment surface as an opaque
+ * screen-print. Supports toolbar-driven move / scale / rotate modes with
+ * 4 corner handles, a rotation arc handle, and a bounding box outline.
  */
-export default function PrintOverlay({ target, texture, zone, placement, front = true, onPlacementChange }) {
+export default function PrintOverlay({ target, texture, zone, placement, front = true, onPlacementChange, tool = 'move' }) {
   const invalidate = useThree((s) => s.invalidate);
   const controls = useThree((s) => s.controls);
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const [geometry, setGeometry] = useState(null);
-  const [dragMode, setDragMode] = useState(null); // null | 'move' | 'scale'
-  const [hovering, setHovering] = useState(false);
+  const [dragMode, setDragMode] = useState(null);
   const timer = useRef(null);
   const poseRef = useRef(null);
   const dragRef = useRef(null);
-  const hoverRef = useRef(false);
   const onChangeRef = useRef(onPlacementChange);
   const groupRef = useRef(null);
 
@@ -101,7 +64,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     const zoneW = zone.size[0] * placement.scale;
     const zoneH = zone.size[1] * placement.scale;
 
-    // Fit the projector to the surface under the print footprint.
     const fit = fitSurface(target, placement.x, zone.y + placement.y, zoneW, zoneH, front);
     if (!fit) {
       setGeometry(null);
@@ -110,8 +72,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     }
     const { center, normal } = fit;
 
-    // Projector basis: +Z = surface normal, right stays horizontal so the art
-    // never looks rotated when the garment tilts.
     const up = new THREE.Vector3(0, 1, 0);
     const right = new THREE.Vector3().crossVectors(up, normal);
     if (right.lengthSq() < 1e-8) right.set(1, 0, 0);
@@ -121,7 +81,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     const euler = new THREE.Euler().setFromRotationMatrix(orientation);
     const quat = new THREE.Quaternion().setFromEuler(euler);
 
-    // Aspect-fit the artwork inside the footprint so it is never distorted.
     let w = zoneW;
     let h = zoneH;
     const img = texture.image;
@@ -130,13 +89,9 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       if (aspect > w / h) h = w / aspect;
       else w = h * aspect;
     }
-    // Clip depth covers the fabric shell inside the footprint (chest is thin;
-    // a padded slab never slices interior surfaces on a clean single mesh).
     const depth = Math.max(w, h) * 0.5 + 0.02;
     const size = new THREE.Vector3(w, h, depth);
 
-    // Clip every mesh inside the print box; fragments live in the projector's
-    // local frame, so all parts share coordinates and merge cleanly.
     const meshes = [];
     target.traverse((o) => {
       if (o.isMesh) meshes.push(o);
@@ -153,7 +108,7 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
         parts.push(g);
         totalVerts += g.attributes.position.count;
       } catch {
-        /* non-printable shell — skip */
+        /* skip */
       }
     }
     if (!parts.length) {
@@ -174,11 +129,6 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       off += g.attributes.position.count;
       g.dispose();
     }
-    // DecalGeometry outputs vertices in WORLD space (line 134 of Three.js
-    // DecalGeometry transforms back via projectorMatrix). The <group> applies
-    // position + quaternion on top, which would double-transform. Transform
-    // the merged geometry back to projector-local space so the group
-    // correctly places the print on the surface.
     const groupPos = center.clone().addScaledVector(normal, 0.0002);
     const invProjector = new THREE.Matrix4()
       .makeRotationFromQuaternion(quat)
@@ -207,14 +157,7 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       if (old && old !== merged) old.dispose();
       return merged;
     });
-    // Lift the whole mesh a hair along its normal so the opaque print always
-    // clears the fabric in the depth buffer. size is the aspect-fit footprint
-    // used by the resize handle's corner placement.
-    // Seat the resize handle just above the ACTUAL surface at the print's
-    // corner: the chest is convex, so the fabric at the corner can bulge
-    // toward the camera past a flat fixed offset — the handle would render on
-    // top (depthTest=false) but raycasts would hit the print body first and
-    // the corner drag would never start a resize.
+
     let handleZ = 0.016;
     if (onChangeRef.current) {
       const corner = new THREE.Vector3(w / 2 - 0.02, h / 2 - 0.02, 10);
@@ -238,15 +181,12 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     invalidate();
   }, [target, texture, zone, placement.scale, placement.x, placement.y, front, invalidate]);
 
-  // Debounced rebuild — placement emits per-input. Pointer drags use the fast
-  // debounce so the print tracks the cursor smoothly.
   useEffect(() => {
     clearTimeout(timer.current);
     timer.current = setTimeout(rebuild, dragMode ? 8 : 80);
     return () => clearTimeout(timer.current);
   }, [rebuild, dragMode]);
 
-  // Rotation is applied to the texture so the art stays surface-conforming.
   useEffect(() => {
     if (!texture) return;
     texture.center.set(0.5, 0.5);
@@ -257,39 +197,23 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
 
   useEffect(() => {
     return () => {
-      poseRef.current = null;
-      dragRef.current = null;
+      clearTimeout(timer.current);
       setGeometry((old) => {
         if (old) old.dispose();
         return null;
       });
+      poseRef.current = null;
+      dragRef.current = null;
     };
   }, []);
 
-  // Lock orbit while the pointer hovers the print or a drag is active.
-  useEffect(() => {
-    if (controls) controls.enabled = !hovering && !dragMode;
-  }, [controls, hovering, dragMode]);
-
-  // Cursor feedback: move over the print, grab while moving it, resize handle.
-  useEffect(() => {
-    const el = gl?.domElement;
-    if (!el) return;
-    if (dragMode === 'scale') el.style.cursor = 'nwse-resize';
-    else if (dragMode === 'move') el.style.cursor = 'grabbing';
-    else if (hovering && editable) el.style.cursor = 'move';
-    else el.style.cursor = '';
-  }, [gl, hovering, dragMode, editable]);
+  const hovering = dragMode !== null;
 
   const onEnter = useCallback(() => {
-    hoverRef.current = true;
-    setHovering(true);
     if (controls && !dragRef.current) controls.enabled = false;
   }, [controls]);
 
   const onLeave = useCallback(() => {
-    hoverRef.current = false;
-    setHovering(false);
     if (controls && !dragRef.current) controls.enabled = true;
   }, [controls]);
 
@@ -297,26 +221,14 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     (e, mode) => {
       const pose = poseRef.current;
       if (!editable || !pose || dragRef.current) return;
-      // R3F dispatches onPointerDown to every hit object with a handler, in
-      // distance order. The handle planes normally sort ahead of the print
-      // body, but during a geometry rebuild the group's matrixWorld can be a
-      // frame stale, so the handle sometimes LOSES the ordering and the print
-      // body's 'move' handler runs alone. Re-test the event ray against the
-      // handle meshes explicitly: whenever the pointer is actually on the
-      // corner handle, it must resize — never move the print.
-      const g = groupRef.current;
-      if (g && mode === 'move') {
-        const test = new THREE.Raycaster();
-        test.ray.copy(e.ray);
-        const first = test.intersectObjects(g.children, false).find((hh) => hh.object !== g.children[0]);
-        if (first) mode = 'scale';
-      }
       e.stopPropagation();
+
       const pivot = pose.position.clone();
       const dir = pivot.clone().sub(camera.position).normalize();
       const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(dir, pivot);
       const hit = new THREE.Vector3();
       if (!e.ray.intersectPlane(plane, hit)) return;
+
       if (mode === 'move') {
         dragRef.current = {
           mode,
@@ -326,7 +238,7 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
           startY: placement.y,
           quatInv: pose.quaternion.clone().invert(),
         };
-      } else {
+      } else if (mode === 'scale') {
         dragRef.current = {
           mode,
           plane,
@@ -334,15 +246,24 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
           startScale: placement.scale,
           startDist: hit.distanceTo(pivot),
         };
+      } else if (mode === 'rotate') {
+        const local = hit.clone().sub(pivot).applyQuaternion(pose.quaternion.clone().invert());
+        const startAngle = Math.atan2(local.y, local.x);
+        dragRef.current = {
+          mode,
+          plane,
+          pivot,
+          startAngle,
+          origRotation: placement.rotation,
+          quatInv: pose.quaternion.clone().invert(),
+        };
       }
       if (controls) controls.enabled = false;
       setDragMode(mode);
     },
-    [editable, camera, controls, placement.x, placement.y, placement.scale]
+    [editable, camera, controls, placement]
   );
 
-  // Window-level drag driver: pointermove can leave the canvas without losing
-  // the drag, and pointerup anywhere ends it reliably.
   useEffect(() => {
     if (!dragMode) return undefined;
     const onMove = (e) => {
@@ -350,21 +271,31 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
       if (!d) return;
       const hit = new THREE.Vector3();
       if (!rayFromNDC(ndcFromEvent(e, gl), camera).intersectPlane(d.plane, hit)) return;
+
       if (d.mode === 'move') {
         const local = hit.sub(d.startPoint).applyQuaternion(d.quatInv);
         onChangeRef.current?.({
           x: clamp(d.startX + local.x, PLACEMENT_MIN, PLACEMENT_MAX),
           y: clamp(d.startY + local.y, PLACEMENT_MIN, PLACEMENT_MAX),
         });
-      } else {
+      } else if (d.mode === 'scale') {
         const dist = hit.distanceTo(d.pivot);
         onChangeRef.current?.({ scale: clamp(d.startScale * (dist / d.startDist), SCALE_MIN, SCALE_MAX) });
+      } else if (d.mode === 'rotate') {
+        const local = hit.clone().sub(d.pivot).applyQuaternion(d.quatInv);
+        const angle = Math.atan2(local.y, local.x);
+        const delta = ((angle - d.startAngle) * 180) / Math.PI;
+        let rot = d.origRotation + delta;
+        rot = ((rot % 360) + 360) % 360;
+        onChangeRef.current?.({ rotation: Math.round(rot) });
       }
     };
     const onUp = () => {
       dragRef.current = null;
       setDragMode(null);
-      if (controls) controls.enabled = !hoverRef.current;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -376,18 +307,41 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
     };
   }, [dragMode, gl, camera, controls]);
 
+  useEffect(() => {
+    const el = gl?.domElement;
+    if (!el) return;
+    if (dragMode === 'scale') el.style.cursor = 'nwse-resize';
+    else if (dragMode === 'move') el.style.cursor = 'grabbing';
+    else if (dragMode === 'rotate') el.style.cursor = 'crosshair';
+    else if (editable) el.style.cursor = tool === 'scale' ? 'nwse-resize' : tool === 'rotate' ? 'crosshair' : 'grab';
+    else el.style.cursor = '';
+  }, [gl, dragMode, editable, tool]);
+
   const pose = poseRef.current;
   if (!geometry || !texture || !pose) return null;
 
-  const hx = pose.size.w / 2 - 0.02;
-  const hy = pose.size.h / 2 - 0.02;
+  const hw = pose.size.w / 2;
+  const hh = pose.size.h / 2;
   const hz = pose.handleZ ?? 0.016;
+  const cornerOff = 0.02;
+  const handleSz = 0.04;
+
+  const corners = [
+    [-hw + cornerOff, -hh + cornerOff],
+    [hw - cornerOff, -hh + cornerOff],
+    [hw - cornerOff, hh - cornerOff],
+    [-hw + cornerOff, hh - cornerOff],
+  ];
+
+  const rotArcR = Math.max(hw, hh) * 0.6;
+
+  const boxColor = dragMode ? '#21f59a' : 'rgba(255,255,255,0.35)';
 
   return (
     <group ref={groupRef} position={pose.position} quaternion={pose.quaternion}>
       <mesh
         geometry={geometry}
-        onPointerDown={editable ? (e) => handleDown(e, 'move') : undefined}
+        onPointerDown={editable ? (e) => handleDown(e, tool) : undefined}
         onPointerOver={editable ? onEnter : undefined}
         onPointerOut={editable ? onLeave : undefined}
         renderOrder={2}
@@ -405,30 +359,92 @@ export default function PrintOverlay({ target, texture, zone, placement, front =
           side={THREE.FrontSide}
         />
       </mesh>
+
       {editable && (
         <>
-          <mesh
-            position={[hx, hy, hz]}
-            onPointerDown={(e) => handleDown(e, 'scale')}
-            onPointerOver={onEnter}
-            onPointerOut={onLeave}
-            renderOrder={4}
-            frustumCulled={false}
-          >
-            <planeGeometry args={[0.14, 0.14]} />
-            <meshBasicMaterial color="#0a2b1d" transparent={false} depthTest={false} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh
-            position={[hx, hy, hz + 0.004]}
-            onPointerDown={(e) => handleDown(e, 'scale')}
-            onPointerOver={onEnter}
-            onPointerOut={onLeave}
-            renderOrder={5}
-            frustumCulled={false}
-          >
-            <planeGeometry args={[0.08, 0.08]} />
-            <meshBasicMaterial color="#21f59a" depthTest={false} side={THREE.DoubleSide} />
-          </mesh>
+          {/* Bounding box outline */}
+          <lineSegments renderOrder={3} frustumCulled={false}>
+            <bufferGeometry>
+              <bufferAttribute
+                attach="attributes-position"
+                count={8}
+                array={new Float32Array([
+                  ...linePoints(new THREE.Vector3(-hw, -hh, hz), new THREE.Vector3(hw, -hh, hz)),
+                  ...linePoints(new THREE.Vector3(hw, -hh, hz), new THREE.Vector3(hw, hh, hz)),
+                  ...linePoints(new THREE.Vector3(hw, hh, hz), new THREE.Vector3(-hw, hh, hz)),
+                  ...linePoints(new THREE.Vector3(-hw, hh, hz), new THREE.Vector3(-hw, -hh, hz)),
+                ])}
+                itemSize={3}
+              />
+            </bufferGeometry>
+            <lineBasicMaterial color={boxColor} transparent opacity={0.6} depthTest={false} />
+          </lineSegments>
+
+          {/* Scale handles — 4 corners */}
+          {tool === 'scale' &&
+            corners.map(([cx, cy], i) => (
+              <mesh
+                key={i}
+                position={[cx, cy, hz + 0.005]}
+                onPointerDown={(e) => handleDown(e, 'scale')}
+                onPointerOver={onEnter}
+                onPointerOut={onLeave}
+                renderOrder={5}
+                frustumCulled={false}
+              >
+                <planeGeometry args={[handleSz, handleSz]} />
+                <meshBasicMaterial color="#21f59a" transparent opacity={0.9} depthTest={false} side={THREE.DoubleSide} />
+              </mesh>
+            ))}
+
+          {/* Rotation handle — arc + dot */}
+          {tool === 'rotate' && (
+            <>
+              <mesh
+                position={[0, rotArcR, hz + 0.005]}
+                onPointerDown={(e) => handleDown(e, 'rotate')}
+                onPointerOver={onEnter}
+                onPointerOut={onLeave}
+                renderOrder={5}
+                frustumCulled={false}
+              >
+                <circleGeometry args={[0.03, 16]} />
+                <meshBasicMaterial color="#21f59a" transparent opacity={0.9} depthTest={false} side={THREE.DoubleSide} />
+              </mesh>
+              {/* Connecting line */}
+              <lineSegments renderOrder={4} frustumCulled={false}>
+                <bufferGeometry>
+                  <bufferAttribute
+                    attach="attributes-position"
+                    count={2}
+                    array={new Float32Array([0, 0, hz + 0.003, 0, rotArcR, hz + 0.003])}
+                    itemSize={3}
+                  />
+                </bufferGeometry>
+                <lineBasicMaterial color="#21f59a" transparent opacity={0.4} depthTest={false} />
+              </lineSegments>
+            </>
+          )}
+
+          {/* Move mode — center crosshair */}
+          {tool === 'move' && !dragMode && (
+            <>
+              <lineSegments renderOrder={4} frustumCulled={false}>
+                <bufferGeometry>
+                  <bufferAttribute
+                    attach="attributes-position"
+                    count={4}
+                    array={new Float32Array([
+                      -0.02, 0, hz + 0.005, 0.02, 0, hz + 0.005,
+                      0, -0.02, hz + 0.005, 0, 0.02, hz + 0.005,
+                    ])}
+                    itemSize={3}
+                  />
+                </bufferGeometry>
+                <lineBasicMaterial color="#21f59a" transparent opacity={0.6} depthTest={false} />
+              </lineSegments>
+            </>
+          )}
         </>
       )}
     </group>

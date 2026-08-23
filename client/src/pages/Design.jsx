@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import GarmentStage from '../components/studio/GarmentStage';
-import DesignEditor from '../components/studio/DesignEditor';
+import DesignToolbar from '../components/studio/DesignToolbar';
 import { PRODUCTS, COLORS, SIZES, PRINT_DEFAULT, productById, colorById } from '../config/design';
 import { useCart } from '../context/CartContext';
 import { api, formatMoney } from '../lib/api';
@@ -377,6 +377,7 @@ export default function Design() {
   const [size, setSize] = useState('M');
   const [art, setArt] = useState(null);
   const [placement, setPlacement] = useState({ ...PRINT_DEFAULT });
+  const [tool, setTool] = useState('move');
   const [designs, setDesigns] = useState(loadDesigns);
   const [aiOpen, setAiOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -528,17 +529,6 @@ export default function Design() {
                 <div className="space-y-2">{toolButtons}</div>
               </div>
               <div>
-                <p className="label">Design editor</p>
-                <div className="h-[280px] lg:h-[calc(100%-8rem)]">
-                  <DesignEditor
-                    placement={placement}
-                    onChange={setPlacement}
-                    artUrl={art}
-                    garmentColor={color.hex}
-                  />
-                </div>
-              </div>
-              <div>
                 <div className="mb-2 flex items-center justify-between">
                   <p className="label !mb-0">My designs</p>
                   <button
@@ -561,11 +551,13 @@ export default function Design() {
             className="card-dark relative order-1 h-[58vh] overflow-hidden lg:order-none lg:col-span-6 lg:h-full"
             onPointerDown={dismissHint}
           >
+            <DesignToolbar tool={tool} onToolChange={setTool} placement={placement} onChange={setPlacement} />
             <GarmentStage
               product={product}
               color={color.hex}
               texture={texture}
               placement={placement}
+              tool={tool}
               resetRef={resetRef}
               onReady={handleReady}
               onPlacementChange={(patch) => setPlacement((prev) => ({ ...prev, ...patch }))}
@@ -698,18 +690,6 @@ export default function Design() {
 
           <div className="card-dark p-4">
             <div className="space-y-2">{toolButtons}</div>
-          </div>
-
-          <div className="card-dark p-4">
-            <p className="label">Design editor</p>
-            <div className="h-[240px]">
-              <DesignEditor
-                placement={placement}
-                onChange={setPlacement}
-                artUrl={art}
-                garmentColor={color.hex}
-              />
-            </div>
           </div>
 
           <div className="card-dark p-4">
