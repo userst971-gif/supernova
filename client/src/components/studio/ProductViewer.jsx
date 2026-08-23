@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import ApparelModel from './ApparelModel';
@@ -6,6 +6,35 @@ import StudioLight from './StudioLight';
 import { onStudioDragging } from './dragState';
 
 let studioBackdrop = null;
+
+/** Disables shadows on all meshes during drag via traverse — no Canvas prop changes. */
+function ShadowManager({ dragging }) {
+  const scene = useThree((s) => s.scene);
+  const gl = useThree((s) => s.gl);
+  const prevShadow = useRef(true);
+
+  useEffect(() => {
+    if (dragging) {
+      scene.traverse((o) => {
+        if (o.isMesh) {
+          if (o.castShadow) { o.castShadow = false; o.userData._wasCast = true; }
+          if (o.receiveShadow) { o.receiveShadow = false; o.userData._wasRecv = true; }
+        }
+      });
+      gl.shadowMap.enabled = false;
+    } else {
+      scene.traverse((o) => {
+        if (o.isMesh) {
+          if (o.userData._wasCast) { o.castShadow = true; delete o.userData._wasCast; }
+          if (o.userData._wasRecv) { o.receiveShadow = true; delete o.userData._wasRecv; }
+        }
+      });
+      gl.shadowMap.enabled = true;
+    }
+  }, [dragging, scene, gl]);
+
+  return null;
+}
 
 export default function ProductViewer({ product, color, texture, placement, tool, face, resetRef, onReady, frameloop = 'demand', diagnose, onPlacementChange }) {
   const [frame, setFrame] = useState(null);
@@ -18,13 +47,14 @@ export default function ProductViewer({ product, color, texture, placement, tool
   return (
     <Canvas
       frameloop={frameloop}
-      dpr={studioDragging ? [1, 1] : [1, 1.75]}
-      gl={{ antialias: !studioDragging, powerPreference: 'high-performance' }}
+      dpr={[1, 1.75]}
+      gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{ fov: product.camera?.fov ?? 34, position: [0, 0.1, 3], near: 0.05, far: 100 }}
-      shadows={!studioDragging}
+      shadows
     >
       <StudioLight />
-      {!studioDragging && studioBackdrop && <primitive object={studioBackdrop} attach="background" />}
+      {studioBackdrop && <primitive object={studioBackdrop} attach="background" />}
+      <ShadowManager dragging={studioDragging} />
       <ApparelModel
         product={product}
         color={color}
@@ -37,9 +67,9 @@ export default function ProductViewer({ product, color, texture, placement, tool
         diagnose={diagnose}
         onPlacementChange={onPlacementChange}
       />
-      {!studioDragging && (
+      <group visible={!studioDragging}>
         <ContactShadows position={[0, -0.58, 0]} opacity={0.55} scale={9} blur={2.8} far={2.6} />
-      )}
+      </group>
       <ViewRig frame={frame} product={product} resetRef={resetRef} />
       <Controls frame={frame} />
     </Canvas>
