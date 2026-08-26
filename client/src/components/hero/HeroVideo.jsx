@@ -7,13 +7,13 @@ const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
 const SIDE_MASK = {
   maskImage:
-    'radial-gradient(ellipse 80% 100% at 50% 46%, black 38%, rgba(0,0,0,0.9) 50%, transparent 62%)',
+    'radial-gradient(ellipse 90% 100% at 50% 48%, black 50%, rgba(0,0,0,0.85) 68%, transparent 82%)',
   WebkitMaskImage:
-    'radial-gradient(ellipse 80% 100% at 50% 46%, black 38%, rgba(0,0,0,0.9) 50%, transparent 62%)',
+    'radial-gradient(ellipse 90% 100% at 50% 48%, black 50%, rgba(0,0,0,0.85) 68%, transparent 82%)',
 };
 
 const VERTICAL_FADE_MASK =
-  'linear-gradient(to bottom, transparent 0%, black 18%, black 87%, transparent 100%)';
+  'linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%)';
 
 const VERTICAL_FADE_STYLE = {
   maskImage: VERTICAL_FADE_MASK,
@@ -88,7 +88,7 @@ export default function HeroVideo() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const SCALE = 0.35;
+    const SCALE = 0.7;
     const offscreen = document.createElement('canvas');
     const offCtx = offscreen.getContext('2d', { willReadFrequently: true });
 
@@ -120,10 +120,10 @@ export default function HeroVideo() {
           const maxC = Math.max(r, g, b);
           const minC = Math.min(r, g, b);
           const sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
-          if (sat < 0.12 && lum < 30) {
+          if (sat < 0.15 && lum < 18) {
             d[i + 3] = 0;
-          } else if (lum < 80) {
-            const boost = 1.5 + (80 - lum) / 80;
+          } else if (lum < 60) {
+            const boost = 1.2 + (60 - lum) / 120;
             d[i] = Math.min(255, Math.round(r * boost));
             d[i + 1] = Math.min(255, Math.round(g * boost));
             d[i + 2] = Math.min(255, Math.round(b * boost));
@@ -166,13 +166,12 @@ export default function HeroVideo() {
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-40"
+      className="pointer-events-none absolute inset-0 z-[15]"
       aria-hidden="true"
-      style={{ mixBlendMode: 'screen' }}
     >
-      <div className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2">
+      <div className="absolute left-1/2 top-[50%] -translate-x-1/2 -translate-y-1/2">
         <div ref={flightRef} className="hero-flight">
-          <div className="aspect-[16/9] h-[42vh] sm:h-[48vh] lg:h-[54vh]">
+          <div className="aspect-[16/9] h-[56vh] sm:h-[62vh] lg:h-[68vh]">
             <div className="pointer-events-none absolute inset-0" style={VERTICAL_FADE_STYLE}>
               <video
                 ref={videoRef}
@@ -186,7 +185,7 @@ export default function HeroVideo() {
                 controls={false}
                 aria-hidden="true"
                 className="absolute inset-0 h-full w-full pointer-events-none"
-                style={{ filter: 'brightness(1.5) contrast(1.4) saturate(1.1)' }}
+                style={{ filter: 'brightness(1.3) contrast(1.2) saturate(1.05)', opacity: 0 }}
               />
               <canvas
                 ref={canvasRef}
