@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const VIDEO_SRC = '/video/hero-supernova-alpha.webm';
+const VIDEO_SRC = '/video/hero-supernova.webm';
 const POSTER_SRC = '/img/hero-video-poster.jpg';
 const LOOP_SECONDS = 10;
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
@@ -16,10 +16,20 @@ const FLIGHT_KEYFRAMES = [
   { transform: 'translate3d(150%, 0, 0)', opacity: 1, offset: 1 },
 ];
 
+const SOFT_EDGE_MASK = {
+  maskImage:
+    'radial-gradient(ellipse 105% 105% at 50% 48%, black 48%, rgba(0,0,0,0.7) 62%, transparent 76%)',
+  WebkitMaskImage:
+    'radial-gradient(ellipse 105% 105% at 50% 48%, black 48%, rgba(0,0,0,0.7) 62%, transparent 76%)',
+};
+
 export default function HeroVideo() {
   const [reduced, setReduced] = useState(false);
   const videoRef = useRef(null);
   const flightRef = useRef(null);
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  const sizeRef = useRef({ w: 0, h: 0 });
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -61,6 +71,66 @@ export default function HeroVideo() {
     };
   }, [reduced]);
 
+  useEffect(() => {
+    if (reduced) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    const offscreen = document.createElement('canvas');
+    const offCtx = offscreen.getContext('2d', { willReadFrequently: true });
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        sizeRef.current = { w: Math.round(width), h: Math.round(height) };
+      }
+    });
+    ro.observe(canvas);
+
+    const draw = () => {
+      const { w, h } = sizeRef.current;
+      if (w > 0 && h > 0 && !video.paused && !video.ended) {
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+          offscreen.width = w;
+          offscreen.height = h;
+        }
+        offCtx.drawImage(video, 0, 0, w, h);
+        const img = offCtx.getImageData(0, 0, w, h);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          const lum = r * 0.299 + g * 0.587 + b * 0.114;
+          if (lum < 12) {
+            d[i + 3] = 0;
+          } else if (lum < 50) {
+            const t = (lum - 12) / 38;
+            d[i + 3] = Math.round(t * 255);
+            const boost = 1.3 + (1 - t) * 0.5;
+            d[i] = Math.min(255, Math.round(r * boost));
+            d[i + 1] = Math.min(255, Math.round(g * boost));
+            d[i + 2] = Math.min(255, Math.round(b * boost));
+          }
+        }
+        offCtx.putImageData(img, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(offscreen, 0, 0);
+      }
+      rafRef.current = requestAnimationFrame(draw);
+    };
+    rafRef.current = requestAnimationFrame(draw);
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [reduced]);
+
   if (reduced) {
     return (
       <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
@@ -83,20 +153,27 @@ export default function HeroVideo() {
       <div className="absolute left-1/2 top-[50%] -translate-x-1/2 -translate-y-1/2">
         <div ref={flightRef} className="hero-flight">
           <div className="aspect-[16/9] h-[56vh] sm:h-[62vh] lg:h-[68vh]">
-            <video
-              ref={videoRef}
-              src={VIDEO_SRC}
-              muted
-              playsInline
-              autoPlay
-              loop
-              preload="metadata"
-              disablePictureInPicture
-              controls={false}
-              aria-hidden="true"
-              className="h-full w-full object-cover pointer-events-none"
-              style={{ filter: 'brightness(1.2) contrast(1.1) saturate(1.1)' }}
-            />
+            <div className="pointer-events-none absolute inset-0">
+              <video
+                ref={videoRef}
+                src={VIDEO_SRC}
+                muted
+                playsInline
+                autoPlay
+                loop
+                preload="metadata"
+                disablePictureInPicture
+                controls={false}
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full pointer-events-none"
+                style={{ opacity: 0 }}
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 h-full w-full pointer-events-none"
+                style={SOFT_EDGE_MASK}
+              />
+            </div>
           </div>
         </div>
       </div>
