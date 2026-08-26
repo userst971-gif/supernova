@@ -1,24 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 
-const VIDEO_SRC = '/video/hero-supernova.webm';
+const VIDEO_SRC = '/video/hero-supernova-alpha.webm';
 const POSTER_SRC = '/img/hero-video-poster.jpg';
 const LOOP_SECONDS = 10;
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
-
-const SIDE_MASK = {
-  maskImage:
-    'radial-gradient(ellipse 110% 110% at 50% 48%, black 42%, rgba(0,0,0,0.6) 60%, transparent 78%)',
-  WebkitMaskImage:
-    'radial-gradient(ellipse 110% 110% at 50% 48%, black 42%, rgba(0,0,0,0.6) 60%, transparent 78%)',
-};
-
-const VERTICAL_FADE_MASK =
-  'linear-gradient(to bottom, transparent 0%, black 6%, black 94%, transparent 100%)';
-
-const VERTICAL_FADE_STYLE = {
-  maskImage: VERTICAL_FADE_MASK,
-  WebkitMaskImage: VERTICAL_FADE_MASK,
-};
 
 const FLIGHT_KEYFRAMES = [
   { transform: 'translate3d(-150%, 0, 0)', opacity: 0, easing: EASE },
@@ -85,10 +70,7 @@ export default function HeroVideo() {
               src={POSTER_SRC}
               alt=""
               className="h-full w-full object-cover"
-              style={{
-                filter: 'brightness(1.14) contrast(1.3) saturate(0.9)',
-                ...SIDE_MASK,
-              }}
+              style={{ filter: 'brightness(1.14) contrast(1.3) saturate(0.9)' }}
             />
           </div>
         </div>
@@ -97,33 +79,24 @@ export default function HeroVideo() {
   }
 
   return (
-    <div
-      className="pointer-events-none absolute inset-0 z-40"
-      aria-hidden="true"
-      style={{ mixBlendMode: 'screen' }}
-    >
+    <div className="pointer-events-none absolute inset-0 z-40" aria-hidden="true">
       <div className="absolute left-1/2 top-[50%] -translate-x-1/2 -translate-y-1/2">
         <div ref={flightRef} className="hero-flight">
           <div className="aspect-[16/9] h-[56vh] sm:h-[62vh] lg:h-[68vh]">
-            <div className="pointer-events-none absolute inset-0" style={VERTICAL_FADE_STYLE}>
-              <video
-                ref={videoRef}
-                src={VIDEO_SRC}
-                muted
-                playsInline
-                autoPlay
-                loop
-                preload="metadata"
-                disablePictureInPicture
-                controls={false}
-                aria-hidden="true"
-                className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                style={{
-                  filter: 'brightness(1.6) contrast(1.5) saturate(1.1)',
-                  ...SIDE_MASK,
-                }}
-              />
-            </div>
+            <video
+              ref={videoRef}
+              src={VIDEO_SRC}
+              muted
+              playsInline
+              autoPlay
+              loop
+              preload="metadata"
+              disablePictureInPicture
+              controls={false}
+              aria-hidden="true"
+              className="h-full w-full object-cover pointer-events-none"
+              style={{ filter: 'brightness(1.2) contrast(1.1) saturate(1.1)' }}
+            />
           </div>
         </div>
       </div>
