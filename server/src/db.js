@@ -7,7 +7,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = resolve(process.env.DB_PATH || './data/supernova.db');
+
+// Persistence: if a Railway volume mount is configured, sit the SQLite file on
+// it so orders/data survive redeploys and restarts (the container filesystem
+// itself is ephemeral). Falls back to DB_PATH or the local ./data directory.
+const VOLUME_MOUNT = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.VOLUME_MOUNT_PATH || '';
+const DB_PATH = VOLUME_MOUNT
+  ? resolve(VOLUME_MOUNT, 'data', 'supernova.db')
+  : resolve(process.env.DB_PATH || './data/supernova.db');
 
 mkdirSync(dirname(DB_PATH), { recursive: true });
 

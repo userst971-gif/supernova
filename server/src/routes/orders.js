@@ -151,14 +151,14 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 /** Admin order search by ref / customer. */
-router.get('/search/all', requireStaff, (req, res) => {
+router.get('/search/all', requireAuth, requireStaff, (req, res) => {
   const { q } = req.query || {};
   if (!q) return res.status(400).json({ error: 'Query is required' });
   const like = `%${String(q).toLowerCase()}%`;
   const rows = db
     .prepare(
       `SELECT * FROM orders
-       WHERE LOWER(order_ref) LIKE ? OR LOWER(email) LIKE ? OR LOWER(name) LIKE ?
+       WHERE LOWER(order_number) LIKE ? OR LOWER(customer_email) LIKE ? OR LOWER(shipping_name) LIKE ?
        ORDER BY created_at DESC LIMIT 25`
     )
     .all(like, like, like);
@@ -178,7 +178,7 @@ router.get('/:id', requireAuth, (req, res) => {
 });
 
 /** Order status transitions (admin). */
-router.post('/:id/status', requireStaff, (req, res) => {
+router.post('/:id/status', requireAuth, requireStaff, (req, res) => {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(Number(req.params.id));
   if (!order) return res.status(404).json({ error: 'Order not found' });
 

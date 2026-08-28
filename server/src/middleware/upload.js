@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = resolve(__dirname, '../../uploads');
+
+// Persist uploads on a Railway volume mount when one is configured, so custom
+// design images survive redeploys (the container filesystem is ephemeral).
+const VOLUME_MOUNT = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.VOLUME_MOUNT_PATH || '';
+const UPLOAD_DIR = VOLUME_MOUNT
+  ? resolve(VOLUME_MOUNT, 'uploads')
+  : resolve(process.env.UPLOAD_DIR || __dirname, '../../uploads');
 const MAX_MB = Number(process.env.MAX_UPLOAD_MB || 8);
 
 const storage = multer.diskStorage({
