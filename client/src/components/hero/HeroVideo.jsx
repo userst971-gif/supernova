@@ -103,19 +103,25 @@ export default function HeroVideo() {
         offCtx.drawImage(video, 0, 0, w, h);
         const img = offCtx.getImageData(0, 0, w, h);
         const d = img.data;
+        const BRIGHTNESS = 1.14;
+        const CONTRAST = 1.3;
+        const adj = (v) => {
+          const c = (v * BRIGHTNESS - 128) * CONTRAST + 128;
+          return c < 0 ? 0 : c > 255 ? 255 : c;
+        };
         for (let i = 0; i < d.length; i += 4) {
-          const r = d[i], g = d[i + 1], b = d[i + 2];
-          const lum = r * 0.299 + g * 0.587 + b * 0.114;
-          if (lum < 12) {
+          const R = adj(d[i]);
+          const G = adj(d[i + 1]);
+          const B = adj(d[i + 2]);
+          const lum = R * 0.299 + G * 0.587 + B * 0.114;
+          if (lum < 8) {
             d[i + 3] = 0;
           } else if (lum < 50) {
-            const t = (lum - 12) / 38;
-            d[i + 3] = Math.round(t * 255);
-            const boost = 1.3 + (1 - t) * 0.5;
-            d[i] = Math.min(255, Math.round(r * boost));
-            d[i + 1] = Math.min(255, Math.round(g * boost));
-            d[i + 2] = Math.min(255, Math.round(b * boost));
+            d[i + 3] = Math.round(((lum - 8) / 42) * 255);
           }
+          d[i] = R;
+          d[i + 1] = G;
+          d[i + 2] = B;
         }
         offCtx.putImageData(img, 0, 0);
         ctx.clearRect(0, 0, w, h);
