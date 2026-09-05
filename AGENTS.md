@@ -69,95 +69,60 @@ No formal test framework. QA is done via headless Edge + puppeteer-core:
 
 - esbuild binary may be flagged by Windows Defender — reinstall via `npm install --force` if it fails
 - `node:sqlite` is a Node.js built-in (no native compilation needed), but requires Node ≥ 22
-- `ModelStage` was removed (replaced by the superhero video). `hero-model.jpg`
-  still exists in `client/public/img` but is no longer referenced by the hero
 - `MountainRange.jsx` is still in the repo but unused. `AuroraCanvas.jsx`,
   `GizaPyramids.jsx`, `StarField.jsx` and `HeroScene.jsx` were **deleted** —
   the hero background is now the user-supplied video. Do not reintroduce a
   second procedural background system.
-- Hero layer order is fixed: background video → dark overlay → title/UI (z-20/30)
-  → character (z-40) → bottom depth fog (z-[45]). The character layer sits
-  above the title/UI so site text never overlays him.
+- Hero layer order is simple now: full-bleed background video → dark overlay
+  → title/UI (z-20/30) → bottom depth fog (z-[45]). The former two-layer
+  system (background video + separate luma-keyed character layer) was replaced
+  by a single full-bleed scene — do not reintroduce a second hero video layer.
 - `AuroraBackground.jsx` (site-wide, fixed `-z-10`, Canvas-2D) is a separate
   component rendered in `App.jsx` — it is NOT part of the hero and shows on
   non-hero pages. Its rAF loop is paused while the route is `/` (the hero's
   opaque `bg-void` section fully covers it) and while the tab is hidden, and
   resumes when neither is true. Leave it alone unless reworking the whole site.
 
-## Hero video animation (implemented)
+## Hero video (implemented — full-bleed single scene)
 
-The hero video is a 1280×720 VP9 10s clip on a near-black background — a
-centred, glowing SUPERNOVA wordmark (brightest around 30–40% height). Files:
-`client/public/video/hero-supernova.webm` + poster `client/public/img/hero-video-poster.jpg`.
-The old `supernova-hero.webm` superhero reel is still in `public/video` but
-unused (kept as backup). No `.mp4` is shipped for the hero video.
+The hero is ONE full-bleed 16:9 scene: the glowing-green-suit figure, centred
+at full height against an atmospheric blur-fill of the same footage (sides
+heavily blurred + darkened). Built from the original portrait clip
+(`Figure_in_glowing_green_suit_202608281125.mp4`, 720×1280 h264 24fps 10s) via
+ffmpeg into a 1280×720 h264 24fps 10s master (`hero-figure.mp4`, audio
+stripped). Files: `client/public/video/hero-figure.mp4` + poster
+`client/public/img/hero-figure-poster.jpg`. Referenced ONLY via
+`client/src/config/hero.js` — never hard-code the path.
 
-Implementation (`client/src/components/hero/HeroVideo.jsx` + `.hero-flight` in
-`client/src/index.css`):
-- `mix-blend-screen` keys the dark background out over the scene. The webm has
-  NO alpha channel, so blend is still required. Video is `loop`ed (10s),
-  muted/autoplay/playsInline, `preload="metadata"`, `poster` removed (the
-  poster was a rectangle source).
-- `.hero-flight` sweeps the element with `translate3d` keyframes driven by the
-  Web Animations API. The animation is `pause()`d and its `currentTime` is set
-  to `(video.currentTime % 10) * 1000` on every `requestAnimationFrame`, so the
-  sweep is frame-locked to the playhead and can never drift. This is the ONLY
-  animation loop on the hero.
-- The video sits in a `aspect-[16/9] h-[42/48/54vh]` box with `object-cover` —
-  DO NOT set `w-auto` directly on the video or it collapses to a squashed 4:3
-  box (Vite/block layout quirk). Stage wrapper is `absolute left-1/2 top-[54%]
-  -translate-x-1/2 -translate-y-1/2`.
-- **No visible video rectangle — this was the recurring bug.** A lone radial
-  mask cannot hide the box: with its centre at 46% height, the top (46%) and
-  bottom (54%) edges of the box land inside the opaque stops, so the rim glow
-  paints bright bars along the top/bottom once the background is
-  bright. The fix is **nested masks** (they multiply; `mask-composite` was
-  unreliable):
-  1. a wrapper div gets `VERTICAL_FADE_MASK` — one `linear-gradient(to bottom,
-     transparent 0%, black 18%, black 87%, transparent 100%)` that fades the
-     top 0–18% and bottom 87–100% (VP9 edge noise, glow falloff) to fully
-     transparent,
-  2. the video + rim keep `SIDE_MASK` — `radial-gradient(ellipse 80% 100% at
-     50% 46%, black 38%, rgba(0,0,0,0.9) 50%, transparent 62%)` for the sides
-     and corners.
-  `VIDEO_FILTER` = `brightness(1.14) contrast(1.3) saturate(0.9)` — a luma
-  key that pushes VP9's dark-grey "black" (~16–25) below black (order matters:
-  brightness BEFORE contrast; too much contrast e.g. 2.4 crushes the logo).
-- **Integration:** a dark `mix-blend-multiply` pool sits UNDER the video and
-  deepens the night scene behind the wordmark so its glow pops; an emerald rim
-  overlay (`RIM_GRADIENT`) catches the aurora on the logo's edges. (The old
-  character-specific ground shadow, floor-light pool and cool haze were
-  removed — a centered logo has no feet.) A bottom depth fog (z-[45]) sits over
-  everything.
-- **Stacking gotcha:** the video must be `position: relative` (not static) —
-  the absolutely-positioned dark pool would otherwise paint ABOVE a static
-  video and multiply the logo itself dim.
-- `prefers-reduced-motion` shows a static centred poster (same
-  SIDE_MASK + rim + pool at `top-[54%]`, no `.hero-flight` wrapper) and the
-  background renders its poster image — no video, no animation at all.
+The old wordmark layer (`HeroVideo.jsx`) and its `.hero-flight` CSS were
+**deleted**; the hero no longer uses luma-keyed superimposed characters.
+No WebGL/procedural backgrounds.
 
-## Hero background (implemented)
+## Hero background / single-scene implementation
 
 `client/src/components/hero/HeroBackground.jsx` renders ONE full-bleed video
 from `client/src/config/hero.js` (`HERO_BACKGROUND_VIDEO`). Current asset:
-`client/public/video/hero-background.mp4` (1280×720 h264, 10s, audio stripped)
-+ poster `client/public/img/hero-background-poster.jpg`. To change the
-background: drop a file into `client/public/video/` and update the config var —
-never hard-code an absolute machine path.
+`client/public/video/hero-figure.mp4` (1280×720 h264, 24fps, 10s, audio
+stripped) + poster `client/public/img/hero-figure-poster.jpg`. This same file
+IS the whole hero scene (see "Hero video" above). To change it: drop a file
+into `client/public/video/` and update the config var — never hard-code an
+absolute machine path. Old assets `hero-background.mp4` / `hero-supernova.webm`
+/ `supernova-hero.webm` / `hero-video-poster.jpg` remain in `public` as unused
+backups only.
 
 - Single `<video>`: absolute inset-0, `object-cover`, muted/autoplay/loop/
   playsInline, `preload="metadata"`, `pointer-events-none`, no controls.
 - A static gradient readability overlay darkens the top (title zone), vignettes
-  the edges and darkens the bottom (character feet) — no animation.
+  the edges and darkens the bottom (figure feet) — no animation.
 - If the asset 404s/decodes (`onError`) it falls back to a static night
   gradient, and reduced-motion renders the poster image instead of playing.
 - Perf: the old WebGL aurora shader (AuroraCanvas) was the heavy layer and is
   deleted; main JS chunk dropped from ~1044 kB to ~352 kB. Do not add WebGL or
   procedural backgrounds back to the hero.
 
-QA: puppeteer drives Edge headless, then samples `video.currentTime` + mover
-`getBoundingClientRect()` at pose and screenshots + luminance maps to confirm:
-exactly 2 videos (bg + character) on desktop/mobile, zero in reduced mode, the
-character is centred at pose, background is full-bleed `object-cover` and
-playing, the four box edges are continuous (avg step < ~4 lum, seam-style),
-the head pops against the background, and zero console/page errors.
+QA: puppeteer drives Edge headless, then samples `video.currentTime` +
+`getBoundingClientRect()` and a 16×9 luma grid of the raw frame to confirm:
+exactly ONE hero video (no leftover canvas/character layer) on desktop/mobile,
+zero in reduced mode, the video is full-bleed `object-cover` and playing, the
+figure is centred with dark blended edges (left/right cols < ~40 lum, centre
+col pops), and zero console/page errors.

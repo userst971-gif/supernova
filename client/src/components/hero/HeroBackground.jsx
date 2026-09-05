@@ -68,13 +68,14 @@ export default function HeroBackground() {
       )}
 
       {/* readability overlay — keeps the AURORA title crisp over the bright
-          aurora, vignettes the edges and darkens the bottom to ground the
-          character's feet. Gradients + box-shadow only, no animation. */}
+          scene, vignettes the edges to blend the blur-fill sides and darkens
+          the bottom to ground the figure. Gradients + box-shadow only, no
+          animation. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(to bottom, rgba(1,3,3,0.62) 0%, rgba(1,3,3,0.3) 24%, rgba(1,3,3,0.13) 40%, transparent 56%), radial-gradient(ellipse 130% 95% at 50% 40%, transparent 52%, rgba(1,3,3,0.42) 82%, rgba(0,1,1,0.85) 100%), linear-gradient(to top, rgba(1,3,3,0.62) 0%, rgba(1,3,3,0.16) 30%, transparent 52%)',
+            'linear-gradient(to bottom, rgba(1,3,3,0.6) 0%, rgba(1,3,3,0.28) 22%, rgba(1,3,3,0.1) 38%, transparent 52%), radial-gradient(ellipse 130% 95% at 50% 40%, transparent 50%, rgba(1,3,3,0.4) 80%, rgba(0,1,1,0.82) 100%), linear-gradient(to top, rgba(1,3,3,0.55) 0%, rgba(1,3,3,0.14) 26%, transparent 46%)',
         }}
       />
     </div>

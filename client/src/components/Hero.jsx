@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import HeroBackground from './hero/HeroBackground';
-import HeroVideo from './hero/HeroVideo';
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -104,10 +103,7 @@ export default function Hero() {
         </motion.div>
       </div>
 
-      {/* superhero entrance video (on top of hero title/UI) */}
-      <HeroVideo />
-
-      {/* foreground depth fog — grounds the superhero into the scene */}
+      {/* foreground depth fog — grounds the scene into the hero */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-[45] h-[22%]"
         aria-hidden="true"

@@ -166,15 +166,6 @@ body {
   }
 }
 
-/* Superhero entrance reel: HeroVideo.jsx drives this element's sweep with a
-   paused Web Animations API animation frame-locked to the video playhead, so no
-   CSS animation is declared here. The static default keeps the clip off-screen
-   left (matching the reel's phase 0) before the JS takes over. */
-.hero-flight {
-  transform: translate3d(-150%, 0, 0);
-  opacity: 0;
-}
-
 @keyframes ai-gem-flow {
   0% {
     background-position: 0% 50%;
